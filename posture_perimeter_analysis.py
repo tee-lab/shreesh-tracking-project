@@ -156,10 +156,10 @@ if __name__ == "__main__":
 	#plt.style.use('dark_background')
 	
     #set this as the path to the directory holding the .npz files
-	abs_path = "/home/shreesh/Videos/data/"
+	abs_path = "./data/"
 	video_filename = "30_fish.MOV"
 
-	max_fish_count = 30
+	max_fish_count = 1
 	
 	for count in range(0, max_fish_count):
 		

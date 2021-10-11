@@ -122,10 +122,10 @@ def moving_average(X, span):
 def main():
 	
 	#set this as the path to the directory holding the .npz files
-	abs_path = "/home/shreesh/Videos/data/"
+	abs_path = "./data/"
 	video_filename = "30_fish.MOV"
 
-	max_fish_count = 30
+	max_fish_count = 1
 
 	#this is the max possible legitimate displacement in one frame
 	#any motion greater than this value is marked as an ID skip
