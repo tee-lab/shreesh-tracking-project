@@ -1,7 +1,9 @@
 import numpy as np
+from random import random
 import matplotlib.pyplot as plt
 import scipy.cluster.vq as vq
 
+posture_frames = np.array(1)
 outlines = np.array(1)
 midlines = np.array(1)
 outline_lengths = np.array(1)
@@ -10,22 +12,34 @@ outline_iterator = 0
 midline_iterator = 0
 X = np.array(1)
 Y = np.array(1)
+X_copy = np.array(1)
+Y_copy = np.array(1)
 
 offsets = np.array(1)
+
+cm_per_pixel = 0.018428 #trex internal parameter value
 
 #the following two defs are utility functions
 
 def moving_average(X, span):
 	return np.convolve(X, np.ones(span), 'valid') / span
 
+def get_distance_nparray(points):
+	return get_distance(points[0,0], points[0,1], points[1,0], points[1,1])
+
 def get_distance(x1, y1, x2, y2):
 	return ( (x2-x1)**2 + (y2-y1)**2 )**0.5
+
+def get_slope(points):
+	return (points[1,1] - points[0,1])/(points[1,0] - points[0,0])
+
+#the following are to load trex data files
 
 def load_posture_file(fish_filename):
 	
 	global outlines, outline_lengths
 	global midlines, midline_lengths
-	global offsets
+	global offsets, posture_frames
 	
 	#load the npz file of the given fish
 	npz = np.load(fish_filename)
@@ -37,52 +51,228 @@ def load_posture_file(fish_filename):
 	midline_lengths = npz["midline_lengths"]
 	
 	offsets = npz["offset"]
+	
+	posture_frames = npz["frames"]
 
 def load_file(fish_filename):
 
-	global X, Y
+	global X, Y, X_copy, Y_copy
 	
 	#load the npz file of the given fish
 	npz = np.load(fish_filename)
 	
 	#extract X, Y position data
-	X = npz["X"]#wcentroid"]
-	Y = npz["Y"]#wcentroid"]
+	X = npz["X#wcentroid"]
+	Y = npz["Y#wcentroid"]
+	
+	X_copy = npz["X#wcentroid"]/cm_per_pixel
+	Y_copy = npz["Y#wcentroid"]/cm_per_pixel
+	
 	#scale up to pixel values using the cm_per_pixel parameter from Trex
-	X /= 0.018428
-	Y /= 0.018428
+	X /= cm_per_pixel
+	Y /= cm_per_pixel
 
-def get_perimeter(curr_outline):
+def get_perimeter(outline):
 	
-	curr_outline_new = np.zeros((curr_outline.shape[0]+1,2))
-	curr_outline_new[-1,:] = curr_outline[0,:]
-	curr_outline_new[0:-1,:] = curr_outline
+	"""This function takes in an outline (periodic) and outputs its perimeter."""
 	
-	segment_lengths = get_distance(curr_outline_new[0:-1,0], curr_outline_new[0:-1,1], curr_outline_new[1:,0], curr_outline_new[1:,1])
+	#to store periodic version of outline for processing purposes
+	outline_new = np.zeros((outline.shape[0]+1,2))
+	outline_new[-1,:] = outline[0,:]
+	outline_new[0:-1,:] = outline
+	
+	segment_lengths = get_distance(outline_new[0:-1,0], outline_new[0:-1,1], outline_new[1:,0], outline_new[1:,1])
 	
 	return sum(segment_lengths)
 
-def kmeans_clustering(outline, count=2, whiten=False):
+def find_angles(slopes):
 	
-	if whiten:
-		outline = vq.whiten(outline)
+	"""This function takes a periodic array of slopes and outputs
+	the corresponding array of angles the slopes make with the x axis.
+	These angles are continuous, ie they vary from theta->theta +/- pi"""
 	
-	line, distort = vq.kmeans(outline, count)
+	#first find straightforward arctan
+	tan_arr = np.arctan(slopes)
 	
-	return line
+	#this will be used to correct discontinuities in the arc tan output
+	increment = 0
+	
+	for i in range(len(tan_arr)):
+		
+		if tan_arr[i-1]-tan_arr[i] > np.pi*0.5: #if angles shifted down by pi
+			increment += np.pi
+		elif tan_arr[i-1]-tan_arr[i] < -np.pi*0.5: #if angles shifted up by pi
+			increment -= np.pi
+		
+		tan_arr[i-1] += increment
+	
+	return tan_arr
+
+def is_point_inside(outline, point):
+	
+	"""This function checks if the given point is inside the given outline.
+	It uses the property that the rays connecting points on the outline with
+	the given point will wind around a circle once as we traverse the outline
+	iff the point is inside the outline, while if the point is outside, the
+	winding amount will be zero."""
+	
+	slopes = (outline[:,1]-point[1])/(outline[:,0]-point[0])
+	slope_angle = find_angles(slopes)
+	
+	return abs(slope_angle[-2]-slope_angle[0]) > np.pi*0.9
+
+def fill_points(outline):
+	
+	"""This function takes in an array of points representing a continuous
+	and periodic outline of a body and outputs an array of points containting
+	the points of the outline along with randomly sampled points inside the outline."""
+	
+	newpoints = np.zeros((outline.shape[0]*3,2))
+	
+	#initially populate with only points on the outline
+	newpoints[0:outline.shape[0],:] = outline
+	newpoints[outline.shape[0]:outline.shape[0]*2,:] = outline
+	newpoints[2*outline.shape[0]:,:] = outline
+	
+	#used to sample random points inside the bounding box of the outline
+	minx = min(outline[:,0])
+	miny = min(outline[:,1])
+	maxx = max(outline[:,0])
+	maxy = max(outline[:,1])
+	
+	#do not fill points if non-finite values found
+	if minx == -np.inf or miny == -np.inf or maxx == np.inf or maxy == np.inf:
+		return newpoints
+	
+	for i in range(2*outline.shape[0]):
+		
+		while True:
+			#keep generating random points until one lands inside the outline
+			newpoints[i,0] = minx + random()*(maxx-minx)
+			newpoints[i,1] = miny + random()*(maxy-miny)
+			
+			if is_point_inside(outline, newpoints[i,:]):
+				break
+	
+	return newpoints
 
 def replace_with_kmeans_centroid(outline, i):
 	
-	outline = offsets[i,:] + outline
+	global midlines
 	
-	line = kmeans_clustering(outline)
+	#holds the centroid of the posture (non-weighted)
+	centroid = np.zeros(2)
 	
-	if get_distance(line[0,0], line[0,1], X[i-1], Y[i-1]) > get_distance(line[1,0], line[1,1], X[i-1], Y[i-1]):
-		X[i] = line[0,0]
-		Y[i] = line[0,1]
+	fix_offset_with_preexisting_centroid = False
+	
+	if fix_offset_with_preexisting_centroid:
+		centroid[0] = sum(outline[:,0])/outline.shape[0]
+		centroid[1] = sum(outline[:,1])/outline.shape[0]
+		
+		outline -= centroid
+		outline[:,0] += X[posture_frames[i]]
+		outline[:,1] += Y[posture_frames[i]]
 	else:
-		X[i] = line[1,0]
-		Y[i] = line[1,1]
+		outline += offsets[i,:]
+	
+	centroid[0] = sum(outline[:,0])/outline.shape[0]
+	centroid[1] = sum(outline[:,1])/outline.shape[0]
+	
+	#all points on and inside the outline
+	newpoints = fill_points(outline)
+	
+	#line with centroids of 2 clusters
+	line2, reject = vq.kmeans(newpoints, 2)
+	
+	find_4means_centroids = False
+	
+	if find_4means_centroids:
+		
+		#here we further subdivide the body into 4 parts
+		#to hopefully find the two heads and two tails
+		
+		#line with centroid of 4 clusters
+		line4, reject = vq.kmeans(newpoints, 4)
+		
+		#holds all pairs of points resulting from 2 clusters 
+		#and pairs of points from 4 clusters
+		final_lines = np.zeros((4,2,2))
+		
+		final_lines[0,0,:] = (line4[0,:] + line4[1,:])/2
+		final_lines[0,1,:] = (line4[2,:] + line4[3,:])/2
+		
+		final_lines[1,0,:] = (line4[0,:] + line4[2,:])/2
+		final_lines[1,1,:] = (line4[1,:] + line4[3,:])/2
+		
+		final_lines[2,0,:] = (line4[0,:] + line4[3,:])/2
+		final_lines[2,1,:] = (line4[2,:] + line4[1,:])/2
+		
+		final_lines[3,:,:] = line2
+		
+		#to find which of these pairs of points form a line that
+		#is most perpendicular to the first line of the midline
+		head_slope = get_slope(midlines[i,0:2,:])
+		head_slope_perp = head_slope
+		
+		line_slopes = np.zeros(4)
+		final_line_lengths = np.zeros(4)
+		
+		for j in range(4):
+			line_slopes[j] = get_slope(final_lines[j,:,:])
+			final_line_lengths[j] = get_distance_nparray(final_lines[j,:,:])
+		
+		ang_diffs = np.arctan( np.abs( (head_slope_perp - line_slopes)/(1 + head_slope_perp*line_slopes) ) )
+		
+		best_line_index = np.argsort(ang_diffs)[0]
+		shortest_line_index = np.argsort(final_line_lengths)[0]
+		
+		if best_line_index == shortest_line_index:
+			best_line_index = np.argsort(ang_diffs)[2]
+	else:
+		final_best_lines = np.zeros((1,2,2))
+		final_best_lines[1,:,:] = line2
+		best_line_index = 0
+	
+	toprint = True
+	
+	if toprint:
+		plt.figure(1)
+		plt.plot(outline[:,0], outline[:,1])
+		plt.scatter(X[posture_frames[i]], Y[posture_frames[i]])
+		#plt.scatter(centroid[0], centroid[1])
+		#plt.figure(2)
+		plt.scatter(newpoints[:,0], newpoints[:,1])
+		#plt.plot(line[:,0], line[:,1])
+		#plt.plot(offsets[i,0]+midlines[i,:,0], offsets[i,1]+midlines[i,:,1])
+		plt.plot(final_lines[best_line_index,:,0], final_lines[best_line_index,:,1])
+		#plt.plot(line[:,0], line[:,1])
+		#plt.plot(line[:,0], line[:,1], label="line")
+		#plt.plot(line_1[:,0], line_1[:,1], label="line1")
+		#plt.plot(line_2[:,0], line_2[:,1], label="line2")
+		#plt.plot(line_3[:,0], line_3[:,1], label="line3")
+		#plt.legend(loc="upper right")
+		plt.show()
+	
+	#this will hold the x,y coords of the fish in the frame before
+	#it merged with another fish.
+	#it could be such that in the prev frame, the fish was inactive.
+	#in that case, we use the current x,y coords instead
+	prev_point = []
+	
+	if X[posture_frames[i]-1] == np.inf or Y[posture_frames[i]-1] == np.inf:
+		prev_point.append(X[posture_frames[i]])
+		prev_point.append(Y[posture_frames[i]])
+	else:
+		prev_point.append(X[posture_frames[i]-1])
+		prev_point.append(Y[posture_frames[i]-1])
+	
+	if get_distance(final_lines[best_line_index,0,0], final_lines[best_line_index,0,1], prev_point[0], prev_point[1]) > \
+	get_distance(final_lines[best_line_index, 1,0], final_lines[best_line_index,1,1], prev_point[0], prev_point[1]):
+		X[posture_frames[i]] = final_lines[best_line_index,0,0]
+		Y[posture_frames[i]] = final_lines[best_line_index,0,1]
+	else:
+		X[posture_frames[i]] = final_lines[best_line_index,1,0]
+		Y[posture_frames[i]] = final_lines[best_line_index,1,1]
 
 def perim_threshold(do_what, threshold):
 	
@@ -119,7 +309,7 @@ def make_periodic(outline):
 
 def plot_curvature(outline, i):
 	
-	#first make the array continuous/periodic
+	#first make the array periodic
 	outline_new = make_periodic(outline)
 	outline_new[1:-1,0] = moving_average(outline_new[:,0], 3)
 	outline_new[1:-1,1] = moving_average(outline_new[:,1], 3)
@@ -159,9 +349,11 @@ if __name__ == "__main__":
 	abs_path = "/home/shreesh/Videos/data/"
 	video_filename = "30_fish.MOV"
 
-	max_fish_count = 30
+	max_fish_count = 5
 	
-	for count in range(0, max_fish_count):
+	for count in range(max_fish_count):
+		
+		print("Processing fish#"+str(count))
 		
 		fish_filename = abs_path + video_filename + "_posture_fish" + str(count) + ".npz"
 		
@@ -176,14 +368,18 @@ if __name__ == "__main__":
 		plt.figure(0)
 		plt.plot(X)
 		plt.title("X")
+		#plt.legend(loc="upper right")
 		plt.figure(1)
 		plt.plot(Y)
 		plt.title("Y")
-		#plt.figure(2)
-		#plt.plot(offsets[:,0])
-		#plt.title("Offset X")
-		#plt.figure(3)
-		#plt.plot(offsets[:,1])
-		#plt.title("Offset Y")
+		#plt.legend(loc="upper right")
+		plt.figure(2)
+		plt.plot(X,Y)
+		plt.figure(3)
+		plt.plot(X-X_copy)
+		plt.title("X diff")
+		plt.figure(4)
+		plt.plot(Y-Y_copy)
+		plt.title("Y diff")
 	
 	plt.show()
