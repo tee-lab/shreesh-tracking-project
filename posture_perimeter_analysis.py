@@ -2,6 +2,7 @@ import numpy as np
 from random import random
 import matplotlib.pyplot as plt
 import scipy.cluster.vq as vq
+from scipy.cluster.hierarchy import fclusterdata
 
 posture_frames = np.array(1)
 outlines = np.array(1)
@@ -14,6 +15,11 @@ X = np.array(1)
 Y = np.array(1)
 X_copy = np.array(1)
 Y_copy = np.array(1)
+fish_count = -1
+
+Xall = np.array([])
+Yall = np.array([])
+pos_frames_all = []
 
 offsets = np.array(1)
 
@@ -33,6 +39,19 @@ def get_distance(x1, y1, x2, y2):
 def get_slope(points):
 	return (points[1,1] - points[0,1])/(points[1,0] - points[0,0])
 
+def get_nearest(fish_listX, fish_listY, x, y):
+	dists = get_distance(fish_listX, fish_listY, x, y)
+	return np.argsort(dists)[1]
+
+def find_inactive_fish(fish_list):
+	inactive_indices = []
+	
+	for i in range(len(fish_list)):
+		if fish_list[i] == np.inf:
+			inactive_indices.append(i)
+	
+	return inactive_indices
+
 #the following are to load trex data files
 
 def load_posture_file(fish_filename):
@@ -44,13 +63,13 @@ def load_posture_file(fish_filename):
 	#load the npz file of the given fish
 	npz = np.load(fish_filename)
 	
-	outlines = npz["outline_points"]
-	midlines = npz["midline_points"]
+	outlines = npz["outline_points"]*cm_per_pixel
+	midlines = npz["midline_points"]*cm_per_pixel
 	
 	outline_lengths = npz["outline_lengths"]
 	midline_lengths = npz["midline_lengths"]
 	
-	offsets = npz["offset"]
+	offsets = npz["offset"]*cm_per_pixel
 	
 	posture_frames = npz["frames"]
 
@@ -65,12 +84,8 @@ def load_file(fish_filename):
 	X = npz["X#wcentroid"]
 	Y = npz["Y#wcentroid"]
 	
-	X_copy = npz["X#wcentroid"]/cm_per_pixel
-	Y_copy = npz["Y#wcentroid"]/cm_per_pixel
-	
-	#scale up to pixel values using the cm_per_pixel parameter from Trex
-	X /= cm_per_pixel
-	Y /= cm_per_pixel
+	X_copy = npz["X#wcentroid"]
+	Y_copy = npz["Y#wcentroid"]
 
 def get_perimeter(outline):
 	
@@ -127,12 +142,13 @@ def fill_points(outline):
 	and periodic outline of a body and outputs an array of points containting
 	the points of the outline along with randomly sampled points inside the outline."""
 	
-	newpoints = np.zeros((outline.shape[0]*3,2))
+	newpoints = np.zeros((0,2))
 	
 	#initially populate with only points on the outline
-	newpoints[0:outline.shape[0],:] = outline
-	newpoints[outline.shape[0]:outline.shape[0]*2,:] = outline
-	newpoints[2*outline.shape[0]:,:] = outline
+	#newpoints[0:outline.shape[0],:] = outline
+	#newpoints[outline.shape[0]:outline.shape[0]*2,:] = outline
+	#newpoints[2*outline.shape[0]:3*outline.shape[0],:] = outline
+	#newpoints[3*outline.shape[0]:,:] = outline
 	
 	#used to sample random points inside the bounding box of the outline
 	minx = min(outline[:,0])
@@ -140,25 +156,38 @@ def fill_points(outline):
 	maxx = max(outline[:,0])
 	maxy = max(outline[:,1])
 	
+	numpoints = 3*int(outline.shape[0]**0.5)
+	
+	xstep = (maxx-minx)/numpoints
+	ystep = (maxy-miny)/numpoints
+	
 	#do not fill points if non-finite values found
 	if minx == -np.inf or miny == -np.inf or maxx == np.inf or maxy == np.inf:
 		return newpoints
 	
-	for i in range(2*outline.shape[0]):
-		
-		while True:
-			#keep generating random points until one lands inside the outline
-			newpoints[i,0] = minx + random()*(maxx-minx)
-			newpoints[i,1] = miny + random()*(maxy-miny)
+	#for i in range(3*outline.shape[0]):
+	for i in range(numpoints):
+		newpoint = np.zeros(2)
+		newpoint[0] = minx + i*xstep
+		for j in range(numpoints):
 			
-			if is_point_inside(outline, newpoints[i,:]):
-				break
+			newpoint[1] = miny + j*ystep
+			
+			#while True:
+				#keep generating random points until one lands inside the outline
+				#newpoints[i,0] = minx + random()*(maxx-minx)
+				#newpoints[i,1] = miny + random()*(maxy-miny)
+				
+			if is_point_inside(outline, newpoint):
+				newpoints = np.append(newpoints, [newpoint], axis=0)
 	
 	return newpoints
 
 def replace_with_kmeans_centroid(outline, i):
 	
 	global midlines
+	
+	#print(posture_frames[i])
 	
 	#holds the centroid of the posture (non-weighted)
 	centroid = np.zeros(2)
@@ -182,7 +211,17 @@ def replace_with_kmeans_centroid(outline, i):
 	newpoints = fill_points(outline)
 	
 	#line with centroids of 2 clusters
-	line2, reject = vq.kmeans(newpoints, 2)
+	line2, _ = vq.kmeans(newpoints, 2)
+	
+	#cluster_indices = fclusterdata(newpoints, t=2, criterion='maxclust')#, metric='euclidean')
+	#cluster_indices -= 1
+	#print(cluster_indices)
+	
+	#line2 = np.zeros((2,2))
+	
+	#for clust in range(2):
+	#	cluster = newpoints[(cluster_indices==clust).astype(bool),:]
+	#	line2[clust,:] = np.sum(cluster, axis=0)/cluster.shape[0]
 	
 	find_4means_centroids = False
 	
@@ -229,50 +268,86 @@ def replace_with_kmeans_centroid(outline, i):
 		if best_line_index == shortest_line_index:
 			best_line_index = np.argsort(ang_diffs)[2]
 	else:
-		final_best_lines = np.zeros((1,2,2))
-		final_best_lines[1,:,:] = line2
+		final_lines = np.zeros((1,2,2))
+		final_lines[0,:,:] = line2
 		best_line_index = 0
 	
 	toprint = True
 	
 	if toprint:
+		print("Frame#"+str(posture_frames[i]))
 		plt.figure(1)
-		plt.plot(outline[:,0], outline[:,1])
-		plt.scatter(X[posture_frames[i]], Y[posture_frames[i]])
-		#plt.scatter(centroid[0], centroid[1])
-		#plt.figure(2)
-		plt.scatter(newpoints[:,0], newpoints[:,1])
-		#plt.plot(line[:,0], line[:,1])
-		#plt.plot(offsets[i,0]+midlines[i,:,0], offsets[i,1]+midlines[i,:,1])
+		plt.plot(outline[:,0], outline[:,1], label="Fish outline")
+		plt.scatter(X[posture_frames[i]], Y[posture_frames[i]], label="Weighted centroid")
+		plt.scatter(centroid[0], centroid[1], label="Outline centroid")
+		plt.legend(loc="upper right")
+		
+		plt.figure(2)
+		plt.scatter(newpoints[:,0], newpoints[:,1], label="Interior points")
+		plt.scatter(final_lines[best_line_index,:,0], final_lines[best_line_index,:,1], label="New centroids")
 		plt.plot(final_lines[best_line_index,:,0], final_lines[best_line_index,:,1])
-		#plt.plot(line[:,0], line[:,1])
-		#plt.plot(line[:,0], line[:,1], label="line")
-		#plt.plot(line_1[:,0], line_1[:,1], label="line1")
-		#plt.plot(line_2[:,0], line_2[:,1], label="line2")
-		#plt.plot(line_3[:,0], line_3[:,1], label="line3")
-		#plt.legend(loc="upper right")
+		plt.legend(loc="upper right")
 		plt.show()
+	
+	replace_points(line2, posture_frames[i])
+	
+	#find_inactive_fish(Xall[:][
+	
+	#if X[posture_frames[i]-1] == np.inf or Y[posture_frames[i]-1] == np.inf:
+	#	prev_point.append(X[posture_frames[i]])
+	#	prev_point.append(Y[posture_frames[i]])
+	#else:
+	#	prev_point.append(X[posture_frames[i]-1])
+	#	prev_point.append(Y[posture_frames[i]-1])
+	
+	#if get_distance(final_lines[best_line_index,0,0], final_lines[best_line_index,0,1], prev_point[0], prev_point[1]) > \
+	#get_distance(final_lines[best_line_index, 1,0], final_lines[best_line_index,1,1], prev_point[0], prev_point[1]):
+	#	X[posture_frames[i]] = final_lines[best_line_index,0,0]
+	#	Y[posture_frames[i]] = final_lines[best_line_index,0,1]
+	#else:
+	#	X[posture_frames[i]] = final_lines[best_line_index,1,0]
+	#	Y[posture_frames[i]] = final_lines[best_line_index,1,1]
+
+def replace_points(line, i):
+	
+	global fish_count, Xall, Yall
+	
+	inactive_indices = find_inactive_fish(Xall[:,i])
+	prev_frame_nearest = get_nearest(Xall[:,i-1], Yall[:,i-1], X[i], Y[i])
+	
+	to_reactivate = False
+	
+	if prev_frame_nearest in inactive_indices:
+		#ie the fish that was nearest in the prev frame is now
+		to_reactivate = True
+		print("Reactivated fish#" + str(prev_frame_nearest) + " at frame " + str(i))
 	
 	#this will hold the x,y coords of the fish in the frame before
 	#it merged with another fish.
 	#it could be such that in the prev frame, the fish was inactive.
 	#in that case, we use the current x,y coords instead
 	prev_point = []
-	
-	if X[posture_frames[i]-1] == np.inf or Y[posture_frames[i]-1] == np.inf:
-		prev_point.append(X[posture_frames[i]])
-		prev_point.append(Y[posture_frames[i]])
+
+	if X[i-1] == np.inf or Y[i-1] == np.inf:
+		prev_point.append(X[i])
+		prev_point.append(Y[i])
 	else:
-		prev_point.append(X[posture_frames[i]-1])
-		prev_point.append(Y[posture_frames[i]-1])
+		prev_point.append(X[i-1])
+		prev_point.append(Y[i-1])
 	
-	if get_distance(final_lines[best_line_index,0,0], final_lines[best_line_index,0,1], prev_point[0], prev_point[1]) > \
-	get_distance(final_lines[best_line_index, 1,0], final_lines[best_line_index,1,1], prev_point[0], prev_point[1]):
-		X[posture_frames[i]] = final_lines[best_line_index,0,0]
-		Y[posture_frames[i]] = final_lines[best_line_index,0,1]
+	if get_distance(line[0,0], line[0,1], prev_point[0], prev_point[1]) < \
+	get_distance(line[1,0], line[1,1], prev_point[0], prev_point[1]):
+		Xall[fish_count, i] = line[0,0]
+		Yall[fish_count, i] = line[0,1]
+		if to_reactivate:
+			Xall[prev_frame_nearest, i] = line[1,0]
+			Yall[prev_frame_nearest, i] = line[1,1]
 	else:
-		X[posture_frames[i]] = final_lines[best_line_index,1,0]
-		Y[posture_frames[i]] = final_lines[best_line_index,1,1]
+		Xall[fish_count, i] = line[1,0]
+		Yall[fish_count, i] = line[1,1]
+		if to_reactivate:
+			Xall[prev_frame_nearest, i] = line[0,0]
+			Yall[prev_frame_nearest, i] = line[0,1]
 
 def perim_threshold(do_what, threshold):
 	
@@ -298,6 +373,16 @@ def perim_threshold(do_what, threshold):
 			do_what(outline_slice, i)
 		
 		outline_iterator = outline_iterator_next
+	
+	if False:
+		plt.figure(1)
+		plt.plot(posture_frames, perims)
+		plt.title("Fish posture perimeters")
+		plt.xlabel("Frame#")
+		plt.ylabel("Perimeter (cm)")
+	#plt.show()
+	
+	return perims
 	
 def make_periodic(outline):
 	outline_new = np.zeros((outline.shape[0]+2,outline.shape[1]))
@@ -349,9 +434,27 @@ if __name__ == "__main__":
 	abs_path = "/home/shreesh/Videos/data/"
 	video_filename = "30_fish.MOV"
 
-	max_fish_count = 5
+	max_fish_count = 30
+	
+	print("Perim threshold = " + str(50*cm_per_pixel))
+	
+	perims = np.array([])
 	
 	for count in range(max_fish_count):
+		fish_filename = abs_path + video_filename + "_fish" + str(count) + ".npz"
+		
+		load_file(fish_filename)
+		
+		if count == 0:
+			Xall = np.array([X])
+			Yall = np.array([Y])
+		else:
+			Xall = np.append(Xall, [X[0:Xall.shape[1]]], axis=0)
+			Yall = np.append(Yall, [Y[0:Xall.shape[1]]], axis=0)
+	
+	for count in range(max_fish_count):
+		
+		fish_count = count
 		
 		print("Processing fish#"+str(count))
 		
@@ -363,23 +466,54 @@ if __name__ == "__main__":
 		
 		load_file(fish_filename)
 		
-		perim_threshold(replace_with_kmeans_centroid, 50)
+		perim_threshold(replace_with_kmeans_centroid, 50*cm_per_pixel)
 		
+		#perims = np.append(perims, perim_threshold(replace_with_kmeans_centroid, 50*cm_per_pixel))
+		
+		if False:
+			plt.figure(0)
+			plt.plot(X)
+			plt.title("X")
+			#plt.legend(loc="upper right")
+			plt.figure(1)
+			plt.plot(Y)
+			plt.title("Y")
+			#plt.legend(loc="upper right")
+			plt.figure(2)
+			plt.plot(X,Y)
+			plt.figure(3)
+			plt.plot(X-X_copy)
+			plt.title("X diff")
+			plt.figure(4)
+			plt.plot(Y-Y_copy)
+			plt.title("Y diff")
+	
+	if True:
 		plt.figure(0)
-		plt.plot(X)
+		for i in range(max_fish_count):
+			plt.plot(Xall[i,:])
 		plt.title("X")
-		#plt.legend(loc="upper right")
 		plt.figure(1)
-		plt.plot(Y)
+		for i in range(max_fish_count):
+			plt.plot(Yall[i,:])
 		plt.title("Y")
-		#plt.legend(loc="upper right")
-		plt.figure(2)
-		plt.plot(X,Y)
-		plt.figure(3)
-		plt.plot(X-X_copy)
-		plt.title("X diff")
-		plt.figure(4)
-		plt.plot(Y-Y_copy)
-		plt.title("Y diff")
+	
+	np.savez("posAll.npz", Xall=Xall, Yall=Yall)
+	
+	#plt.figure(1)
+	#plt.plot(perims)
+	#plt.title("Fish posture perimeters")
+	#plt.xlabel("Frame#")
+	#plt.ylabel("Perimeter (cm)")
+	
+	#plt.figure(2)
+	#plt.hist(perims, bins=40)
+	#plt.title("Perimeter frequencies")
+	#plt.xlabel("Perimeter (cm)")
+	#plt.ylabel("Frequency")
+	#plt.show()
+	
+	#print("Avg perimeter: " + str(np.mean(perims)))
+	#print("Std dev      : " + str(np.std(perims)))
 	
 	plt.show()
