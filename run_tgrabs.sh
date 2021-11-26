@@ -1,2 +1,2 @@
 #!/bin/bash
-tgrabs -i /mnt/D/Thesis_Work/shreesh-tracking-project/30_fish_proc.mp4 -o /mnt/D/Thesis_Work/shreesh-tracking-project/30_fish_proc.mp4.pv #-s /mnt/D/Thesis_Work/shreesh-tracking-project/30_fish_proc.mp4.settings
+tgrabs -i /mnt/D/Thesis_Work/shreesh-tracking-project/$1_fish.MOV -o /mnt/D/Thesis_Work/shreesh-tracking-project/$1_fish.MOV.pv -s /mnt/D/Thesis_Work/shreesh-tracking-project/$1_fish.MOV.settings
