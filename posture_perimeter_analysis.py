@@ -1,8 +1,9 @@
+import sys
 import numpy as np
 from random import random
 import matplotlib.pyplot as plt
 import scipy.cluster.vq as vq
-from scipy.cluster.hierarchy import fclusterdata
+#from scipy.cluster.hierarchy import fclusterdata
 
 posture_frames = np.array(1)
 outlines = np.array(1)
@@ -19,7 +20,7 @@ fish_count = -1
 
 Xall = np.array([])
 Yall = np.array([])
-pos_frames_all = []
+frames_array = []
 
 offsets = np.array(1)
 
@@ -75,7 +76,7 @@ def load_posture_file(fish_filename):
 
 def load_file(fish_filename):
 
-	global X, Y, X_copy, Y_copy
+	global X, Y, X_copy, Y_copy, frames_array
 	
 	#load the npz file of the given fish
 	npz = np.load(fish_filename)
@@ -86,6 +87,9 @@ def load_file(fish_filename):
 	
 	X_copy = npz["X#wcentroid"]
 	Y_copy = npz["Y#wcentroid"]
+	
+	if len(frames_array) == 0:
+		frames_array = npz["frame"]
 
 def get_perimeter(outline):
 	
@@ -213,66 +217,7 @@ def replace_with_kmeans_centroid(outline, i):
 	#line with centroids of 2 clusters
 	line2, _ = vq.kmeans(newpoints, 2)
 	
-	#cluster_indices = fclusterdata(newpoints, t=2, criterion='maxclust')#, metric='euclidean')
-	#cluster_indices -= 1
-	#print(cluster_indices)
-	
-	#line2 = np.zeros((2,2))
-	
-	#for clust in range(2):
-	#	cluster = newpoints[(cluster_indices==clust).astype(bool),:]
-	#	line2[clust,:] = np.sum(cluster, axis=0)/cluster.shape[0]
-	
-	find_4means_centroids = False
-	
-	if find_4means_centroids:
-		
-		#here we further subdivide the body into 4 parts
-		#to hopefully find the two heads and two tails
-		
-		#line with centroid of 4 clusters
-		line4, reject = vq.kmeans(newpoints, 4)
-		
-		#holds all pairs of points resulting from 2 clusters 
-		#and pairs of points from 4 clusters
-		final_lines = np.zeros((4,2,2))
-		
-		final_lines[0,0,:] = (line4[0,:] + line4[1,:])/2
-		final_lines[0,1,:] = (line4[2,:] + line4[3,:])/2
-		
-		final_lines[1,0,:] = (line4[0,:] + line4[2,:])/2
-		final_lines[1,1,:] = (line4[1,:] + line4[3,:])/2
-		
-		final_lines[2,0,:] = (line4[0,:] + line4[3,:])/2
-		final_lines[2,1,:] = (line4[2,:] + line4[1,:])/2
-		
-		final_lines[3,:,:] = line2
-		
-		#to find which of these pairs of points form a line that
-		#is most perpendicular to the first line of the midline
-		head_slope = get_slope(midlines[i,0:2,:])
-		head_slope_perp = head_slope
-		
-		line_slopes = np.zeros(4)
-		final_line_lengths = np.zeros(4)
-		
-		for j in range(4):
-			line_slopes[j] = get_slope(final_lines[j,:,:])
-			final_line_lengths[j] = get_distance_nparray(final_lines[j,:,:])
-		
-		ang_diffs = np.arctan( np.abs( (head_slope_perp - line_slopes)/(1 + head_slope_perp*line_slopes) ) )
-		
-		best_line_index = np.argsort(ang_diffs)[0]
-		shortest_line_index = np.argsort(final_line_lengths)[0]
-		
-		if best_line_index == shortest_line_index:
-			best_line_index = np.argsort(ang_diffs)[2]
-	else:
-		final_lines = np.zeros((1,2,2))
-		final_lines[0,:,:] = line2
-		best_line_index = 0
-	
-	toprint = True
+	toprint = False
 	
 	if toprint:
 		print("Frame#"+str(posture_frames[i]))
@@ -284,70 +229,81 @@ def replace_with_kmeans_centroid(outline, i):
 		
 		plt.figure(2)
 		plt.scatter(newpoints[:,0], newpoints[:,1], label="Interior points")
-		plt.scatter(final_lines[best_line_index,:,0], final_lines[best_line_index,:,1], label="New centroids")
-		plt.plot(final_lines[best_line_index,:,0], final_lines[best_line_index,:,1])
+		plt.scatter(line2[:,0], line2[:,1], label="New centroids")
+		plt.plot(line2[:,0], line2[:,1])
 		plt.legend(loc="upper right")
 		plt.show()
 	
-	replace_points(line2, posture_frames[i])
-	
-	#find_inactive_fish(Xall[:][
-	
-	#if X[posture_frames[i]-1] == np.inf or Y[posture_frames[i]-1] == np.inf:
-	#	prev_point.append(X[posture_frames[i]])
-	#	prev_point.append(Y[posture_frames[i]])
-	#else:
-	#	prev_point.append(X[posture_frames[i]-1])
-	#	prev_point.append(Y[posture_frames[i]-1])
-	
-	#if get_distance(final_lines[best_line_index,0,0], final_lines[best_line_index,0,1], prev_point[0], prev_point[1]) > \
-	#get_distance(final_lines[best_line_index, 1,0], final_lines[best_line_index,1,1], prev_point[0], prev_point[1]):
-	#	X[posture_frames[i]] = final_lines[best_line_index,0,0]
-	#	Y[posture_frames[i]] = final_lines[best_line_index,0,1]
-	#else:
-	#	X[posture_frames[i]] = final_lines[best_line_index,1,0]
-	#	Y[posture_frames[i]] = final_lines[best_line_index,1,1]
+	unmerge(line2, posture_frames[i])
 
-def replace_points(line, i):
+def unmerge(centroids, frame):
+	
+	"""Take the two centroids you got from k-means clustering and try to reassign """
 	
 	global fish_count, Xall, Yall
 	
-	inactive_indices = find_inactive_fish(Xall[:,i])
-	prev_frame_nearest = get_nearest(Xall[:,i-1], Yall[:,i-1], X[i], Y[i])
+	inactive_indices = find_inactive_fish(Xall[:,frame])
+	prev_frame_nearest = get_nearest(Xall[:,frame-1], Yall[:,frame-1], X[frame], Y[frame])
 	
+	#default behavior is to not reactivate. this stops edge cases from popping up
 	to_reactivate = False
 	
 	if prev_frame_nearest in inactive_indices:
-		#ie the fish that was nearest in the prev frame is now
+		#ie the fish that was nearest in the prev frame is now inactive
 		to_reactivate = True
-		print("Reactivated fish#" + str(prev_frame_nearest) + " at frame " + str(i))
+		print("Reactivating fish#" + str(prev_frame_nearest) + " at frame " + str(frame))
 	
 	#this will hold the x,y coords of the fish in the frame before
 	#it merged with another fish.
 	#it could be such that in the prev frame, the fish was inactive.
 	#in that case, we use the current x,y coords instead
 	prev_point = []
-
-	if X[i-1] == np.inf or Y[i-1] == np.inf:
-		prev_point.append(X[i])
-		prev_point.append(Y[i])
-	else:
-		prev_point.append(X[i-1])
-		prev_point.append(Y[i-1])
 	
-	if get_distance(line[0,0], line[0,1], prev_point[0], prev_point[1]) < \
-	get_distance(line[1,0], line[1,1], prev_point[0], prev_point[1]):
-		Xall[fish_count, i] = line[0,0]
-		Yall[fish_count, i] = line[0,1]
-		if to_reactivate:
-			Xall[prev_frame_nearest, i] = line[1,0]
-			Yall[prev_frame_nearest, i] = line[1,1]
+	if X[frame-2] == np.inf:
+		if X[frame-1] == np.inf:
+			#if no previous point available, compare new centroids with current position
+			prev_point.append(X[frame])
+			prev_point.append(Y[frame])
+		else:
+			#if one previous point available, compare new centroids with prev frame position
+			prev_point.append(X[frame-1])
+			prev_point.append(Y[frame-1])
 	else:
-		Xall[fish_count, i] = line[1,0]
-		Yall[fish_count, i] = line[1,1]
+		#if two previous points available, compare new centroids with extrapolated point
+		prev_point.append(2*X[frame-1] - X[frame-2])
+		prev_point.append(2*Y[frame-1] - Y[frame-2])
+	
+	if get_distance(centroids[0,0], centroids[0,1], prev_point[0], prev_point[1]) < \
+	get_distance(centroids[1,0], centroids[1,1], prev_point[0], prev_point[1]):
+		Xall[fish_count, frame] = centroids[0,0]
+		Yall[fish_count, frame] = centroids[0,1]
 		if to_reactivate:
-			Xall[prev_frame_nearest, i] = line[0,0]
-			Yall[prev_frame_nearest, i] = line[0,1]
+			Xall[prev_frame_nearest, frame] = centroids[1,0]
+			Yall[prev_frame_nearest, frame] = centroids[1,1]
+	else:
+		Xall[fish_count, frame] = centroids[1,0]
+		Yall[fish_count, frame] = centroids[1,1]
+		if to_reactivate:
+			Xall[prev_frame_nearest, frame] = centroids[0,0]
+			Yall[prev_frame_nearest, frame] = centroids[0,1]
+	
+def fill_singleframe_missing():
+	for fish in range(Xall.shape[0]):
+		for frame in range(1,Xall.shape[1]-1):
+			if Xall[fish, frame-1] != np.inf and Xall[fish, frame] == np.inf and Xall[fish, frame+1] != np.inf:
+				Xall[fish, frame] = (Xall[fish, frame-1] + Xall[fish, frame+1])/2
+				Yall[fish, frame] = (Yall[fish, frame-1] + Yall[fish, frame+1])/2
+
+def reject_frames():
+	for frame in range(Xall.shape[1]):
+		inactive_fish_count = 0
+		for fish in range(Xall.shape[0]):
+			if Xall[fish, frame] == np.inf or Xall[fish, frame] == 0:
+				inactive_fish_count += 1
+		
+		if inactive_fish_count > 4:
+			Xall[:, frame] = np.nan
+			Yall[:, frame] = np.nan
 
 def perim_threshold(do_what, threshold):
 	
@@ -391,70 +347,51 @@ def make_periodic(outline):
 	outline_new[1:-1,:] = outline
 	
 	return outline_new
-
-def plot_curvature(outline, i):
-	
-	#first make the array periodic
-	outline_new = make_periodic(outline)
-	outline_new[1:-1,0] = moving_average(outline_new[:,0], 3)
-	outline_new[1:-1,1] = moving_average(outline_new[:,1], 3)
-	outline_new = make_periodic(outline_new[1:-1,:])
-	
-	#these hold the first and second derivatives of the x and y components of the outline
-	der = np.zeros(outline.shape)
-	dder = np.zeros(outline.shape)
-	
-	#forward difference
-	der = (outline_new[2:,:] - outline_new[0:-2,:])/2
-	der_new = make_periodic(der)
-	
-	dder = (der_new[2:,:] - der_new[0:-2,:])/2
-	
-	#find the curvature of the outline along its length
-	curvature = (der[:,0]*dder[:,1] - der[:,1]*dder[:,0])/((der[:,0]**2 + der[:,1]**2)**1.5)
-	periodic_curvature = np.zeros(len(curvature)+2)
-	periodic_curvature[0] = curvature[-1]
-	periodic_curvature[-1] = curvature[0]
-	periodic_curvature[1:-1] = curvature
-	
-	#find the derivative of the curvature
-	curve_der = periodic_curvature[1:-1] - periodic_curvature[0:-2]
-	
-	plt.figure(1)
-	plt.plot(curve_der)
-	plt.figure(2)
-	plt.plot(outline[:,0], outline[:,1])
-	plt.show()
 	
 if __name__ == "__main__":
 
 	#plt.style.use('dark_background')
 	
-    #set this as the path to the directory holding the .npz files
-	abs_path = "/home/shreesh/Videos/data/"
-	video_filename = "30_fish.MOV"
-
-	max_fish_count = 30
+	fish_count = int(sys.argv[1])
 	
-	print("Perim threshold = " + str(50*cm_per_pixel))
+	#set this as the path to the directory holding the .npz files
+	abs_path = "/home/shreesh/Videos/data/"
+	
+	video_filename = str(fish_count)+"_fish.MOV"
+	
+	print(sys.argv[1])
+	
+	perim_threshold_value = 0.65 if fish_count == 15 else 0.92 if fish_count == 30 else 1
+	
+	print(perim_threshold)
 	
 	perims = np.array([])
 	
-	for count in range(max_fish_count):
+	fish_filename = abs_path + video_filename + "_fish0.npz"
+		
+	load_file(fish_filename)
+	
+	max_frames = 4000 if fish_count == 30 else 6000
+	
+	Xall = np.zeros((fish_count, max_frames))
+	Yall = np.zeros((fish_count, max_frames))
+	
+	print("Xall shape: ", Xall.shape)
+	
+	Xall[0,0:len(X)] = X
+	Yall[0,0:len(Y)] = Y
+	
+	for count in range(1,fish_count):
 		fish_filename = abs_path + video_filename + "_fish" + str(count) + ".npz"
 		
 		load_file(fish_filename)
 		
-		if count == 0:
-			Xall = np.array([X])
-			Yall = np.array([Y])
-		else:
-			Xall = np.append(Xall, [X[0:Xall.shape[1]]], axis=0)
-			Yall = np.append(Yall, [Y[0:Xall.shape[1]]], axis=0)
-	
-	for count in range(max_fish_count):
+		print("X shape: ", X.shape)
 		
-		fish_count = count
+		Xall[count,0:len(X)] = X
+		Yall[count,0:len(Y)] = Y
+	
+	for count in range(fish_count):
 		
 		print("Processing fish#"+str(count))
 		
@@ -466,7 +403,7 @@ if __name__ == "__main__":
 		
 		load_file(fish_filename)
 		
-		perim_threshold(replace_with_kmeans_centroid, 50*cm_per_pixel)
+		perim_threshold(replace_with_kmeans_centroid, perim_threshold_value)
 		
 		#perims = np.append(perims, perim_threshold(replace_with_kmeans_centroid, 50*cm_per_pixel))
 		
@@ -488,17 +425,27 @@ if __name__ == "__main__":
 			plt.plot(Y-Y_copy)
 			plt.title("Y diff")
 	
+	fill_singleframe_missing()
+	reject_frames()
+	
 	if True:
 		plt.figure(0)
-		for i in range(max_fish_count):
+		for i in range(fish_count):
 			plt.plot(Xall[i,:])
 		plt.title("X")
 		plt.figure(1)
-		for i in range(max_fish_count):
+		for i in range(fish_count):
 			plt.plot(Yall[i,:])
 		plt.title("Y")
 	
-	np.savez("posAll.npz", Xall=Xall, Yall=Yall)
+	#inf_cnt = np.sum(np.isnan(Xall))
+	inf_cnt = np.sum(np.isinf(Xall))
+	
+	print("Inf cnt: " + str(inf_cnt))
+	
+	print("Saving file: posAll_"+str(fish_count)+".npz")
+	
+	np.savez("posAll_"+str(fish_count)+".npz", Xall=Xall, Yall=Yall)
 	
 	#plt.figure(1)
 	#plt.plot(perims)
@@ -513,7 +460,7 @@ if __name__ == "__main__":
 	#plt.ylabel("Frequency")
 	#plt.show()
 	
-	#print("Avg perimeter: " + str(np.mean(perims)))
-	#print("Std dev      : " + str(np.std(perims)))
+	print("Avg perimeter: " + str(np.mean(perims)))
+	print("Std dev      : " + str(np.std(perims)))
 	
 	plt.show()
