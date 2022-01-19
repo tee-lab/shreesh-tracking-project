@@ -72,8 +72,8 @@ def generate_heatmap():
 			
 			frequencies[x_index, y_index] += 1
 	
-	print("Number of blocks in heatmap: " + str(grid_count_x) + "x" + str(grid_count_y))
-	print("Actual ratio of sides of heatmap: " + str(xwidth) + " x " + str(ywidth))
+	print("Ratio of number of blocks in heatmap: " + str(grid_count_x/grid_count_y) + " or " + str(grid_count_y/grid_count_x))
+	print("Actual ratio of sides of heatmap: " + str(xwidth/ywidth) + " or " + str(ywidth/xwidth))
 	
 	plt.imshow(frequencies, cmap='hot', interpolation='gaussian')
 

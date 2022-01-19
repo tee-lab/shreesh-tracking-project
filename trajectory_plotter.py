@@ -1,28 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
-def reject_frames():
-	
-	global Xall, Yall	
-	
-	for frame in range(Xall.shape[1]):
-		inactive_fish_count = 0
-		for fish in range(Xall.shape[0]):
-			if Xall[fish, frame] == np.inf:
-				print("found inactive")
-				inactive_fish_count += 1
-		
-		if inactive_fish_count > 0:
-			Xall[:, frame] = np.inf
-			Yall[:, frame] = np.inf
-			print("Inactivated all fish at frame: ", frame)
-
-npz = np.load("posAll_15.npz")
+npz = np.load("posAll_"+sys.argv[1]+".npz")
 
 Xall = npz["Xall"]
 Yall = npz["Yall"]
-
-reject_frames()
 
 plt.figure(1)
 for i in range(Xall.shape[0]):
@@ -36,4 +19,11 @@ plt.figure(3)
 for i in range(Yall.shape[0]):
 	plt.plot(Xall[i,:], Yall[i,:])
 plt.title("X vs Y")
+
+total_fish = np.sum(np.isfinite(Xall), axis=0)
+
+plt.figure(4)
+plt.plot(total_fish)
+plt.title("Number of active fish per frame")
+
 plt.show()

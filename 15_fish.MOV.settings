@@ -1,4 +1,4 @@
-crop_offsets=[0.076,0.0,0.076,0.0]
+crop_offsets=[0.18,0.0,0.18,0.0]
 
 use_adaptive_threshold=true
 
