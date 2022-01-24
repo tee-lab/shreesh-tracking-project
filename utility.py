@@ -99,46 +99,6 @@ def read_csv(filename):
 
 	return switch_array
 
-def onclick(event):
-	print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-		('double' if event.dblclick else 'single', event.button,
-		event.x, event.y, event.xdata, event.ydata))
-
-def make_histogram(switch_array_1, switch_array_2, switch_array, plotcolor="blue"):
-	del_t = []
-	t = [0]
-
-	for i in range(1,len(switch_array)):
-		t.append(switch_array[i].frame_num)
-		del_t.append(switch_array[i].frame_num - switch_array[i-1].frame_num)
-
-	t.sort()
-
-
-	#plt.figure(1)
-	fig, ax = plt.subplots()
-	ax.bar(t[1:],del_t,width=100, color=plotcolor)
-	plt.title("ID Switch locations in video")
-	plt.xlabel("Frame stamp")
-	plt.ylabel("Length of errorless tracking interval")
-	cid = fig.canvas.mpl_connect('button_press_event', onclick)
-
-	#plt.figure(2)
-	fig, ax = plt.subplots()
-	plt.bar(range(1,len(switch_array)),del_t, color=plotcolor)
-	plt.title("Time differences between two switches")
-	plt.ylabel("Length of errorless tracking intervals")
-	plt.xlabel("ID Switch number")
-	cid = fig.canvas.mpl_connect('button_press_event', onclick)
-
-	del_t.sort()
-	print("Differences:")
-	print(del_t)
-	print("Framestamps:")
-	print(t)
-	print("Switches: ", len(switch_array)-2)
-	plt.show()
-
 def load_posture_file(config_file, count):
 
 	cm_per_pixel = 0.02
@@ -172,6 +132,7 @@ def load_position_file(config_file, count):
 	X = npz["X#wcentroid"]
 	Y = npz["Y#wcentroid"]
 	frames_array = npz["frame"]
+	missing = npz["missing"]
 
 	return X, Y, frames_array
 
@@ -236,6 +197,7 @@ def collate(config_file, fill_gaps=False):
 
 	Xall = np.zeros((config_file.fish_count, min_frames))
 	Yall = np.zeros((config_file.fish_count, min_frames))
+	missing_all = np.zeros((config_file.fish_count, min_frames), dtype=bool)
 
 	for count in range(config_file.fish_count):
 		filename = config_file.video_dir +\
@@ -243,15 +205,30 @@ def collate(config_file, fill_gaps=False):
 
 		X, Y, _ = load_position_file(config_file, count)
 
+		npz = np.load(filename)
+		missing = npz["missing"]
+
 		if fill_gaps:
 			X = fill_in_gaps(X)
 			Y = fill_in_gaps(Y)
+
 		Xall[count,:] = X[0:min_frames]
 		Yall[count,:] = Y[0:min_frames]
+		missing_all[count,:] = missing[0:min_frames]
 
-	return Xall, Yall
+	if fill_gaps:
+		reject_frames = []
+	else:
+		reject_frames = np.zeros(min_frames, dtype=bool)
+
+		for i in range(min_frames):
+			if sum(missing_all[:,i]) > 2:
+				reject_frames[i] = True
+
+	return Xall, Yall, reject_frames
 
 if __name__=="__main__":
-	read_csv()
+	#read_csv()
+	exit()
 	#write_csv()
 	#make_histogram()

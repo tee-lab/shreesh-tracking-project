@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import utility as utils
+import sys
 
 posture_frames = np.array(1)
 outlines = np.array(1)
@@ -90,7 +91,9 @@ def plot_skips(cfg):
 
 if __name__ == "__main__":
 
-	cfg = utils.Config("config_files/MVI_0248.csv")
+	filename = sys.argv[1]
+
+	cfg = utils.Config("config_files/"+filename+".csv")
 
 	plot_perims(cfg)
 	plot_skips(cfg)

@@ -18,7 +18,7 @@ outline_iterator = 0
 X = np.array(1)
 Y = np.array(1)
 
-current_fish_count = -1
+current_fish_index = -1
 
 Xall = np.array([])
 Yall = np.array([])
@@ -107,7 +107,7 @@ def fill_points(outline):
 	maxx = max(outline[:,0])
 	maxy = max(outline[:,1])
 
-	numpoints = 3*int(outline.shape[0]**0.5)
+	numpoints = int(2.5*(outline.shape[0]**0.5))
 
 	xstep = (maxx-minx)/numpoints
 	ystep = (maxy-miny)/numpoints
@@ -127,6 +127,8 @@ def fill_points(outline):
 	return np.array(newpoints)
 
 def replace_with_kmeans_centroid(outline, i):
+
+	global offsets
 
 	#holds the centroid of the posture (non-weighted)
 	centroid = np.zeros(2)
@@ -268,16 +270,16 @@ def fill_singleframe_missing():
 				Xall[fish, frame] = (Xall[fish, frame-1] + Xall[fish, frame+1])/2
 				Yall[fish, frame] = (Yall[fish, frame-1] + Yall[fish, frame+1])/2
 
-def reject_frames():
-	for frame in range(Xall.shape[1]):
-		inactive_fish_count = 0
-		for fish in range(Xall.shape[0]):
-			if Xall[fish, frame] == np.inf or Xall[fish, frame] == 0:
-				inactive_fish_count += 1
-
-		if inactive_fish_count > 4:
-			Xall[:, frame] = np.inf
-			Yall[:, frame] = np.inf
+# def reject_frames():
+# 	for frame in range(Xall.shape[1]):
+# 		inactive_fish_count = 0
+# 		for fish in range(Xall.shape[0]):
+# 			if Xall[fish, frame] == np.inf or Xall[fish, frame] == 0:
+# 				inactive_fish_count += 1
+#
+# 		if inactive_fish_count > 4:
+# 			Xall[:, frame] = np.inf
+# 			Yall[:, frame] = np.inf
 
 def perim_threshold(do_what, threshold):
 
@@ -286,12 +288,15 @@ def perim_threshold(do_what, threshold):
 	Once thresholded, the "do_what" definition is called to analyze the outline
 	(with the appropriate parameters passed to it)"""
 
-	global outline_lengths, outlines, X, Y, current_fish_count
+	global Xall, outline_lengths, outlines, posture_frames, X, Y, current_fish_index
 
 	outline_iterator = 0
 	perims = np.zeros(outline_lengths.shape)
 
 	for i in range(len(outline_lengths)):
+
+		if posture_frames[i] in reject_frames or posture_frames[i] >= Xall.shape[1]:
+			continue
 
 		outline_iterator_next = outline_iterator + int(outline_lengths[i])
 
@@ -308,29 +313,31 @@ def perim_threshold(do_what, threshold):
 
 if __name__ == "__main__":
 
-	cfg = utils.Config("config_files/MVI_0248.csv")
+	filename = sys.argv[1]
+
+	cfg = utils.Config("config_files/"+filename+".csv")
 
 	max_fish_count = cfg.fish_count
 	perim_threshold_value = cfg.perim_thresh
 
 	perims = np.array([])
 
-	Xall, Yall = utils.collate(cfg, fill_gaps=False)
+	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
 
 	if True:
 		plt.figure(0)
-		for i in range(fish_count):
+		for i in range(cfg.fish_count):
 			plt.plot(Xall[i,:])
 		plt.title("X")
 		plt.figure(1)
-		for i in range(fish_count):
+		for i in range(cfg.fish_count):
 			plt.plot(Yall[i,:])
 		plt.title("Y")
 		plt.show()
 
 	current_fish_index = 0
 
-	for count in range(fish_count):
+	for count in range(cfg.fish_count):
 
 		print("Processing fish#"+str(count))
 
@@ -338,7 +345,7 @@ if __name__ == "__main__":
 
 		X, Y, _ = utils.load_position_file(cfg, count)
 
-		current_fish_count = count
+		current_fish_index = count
 
 		perim_threshold(replace_with_kmeans_centroid, perim_threshold_value)
 
@@ -357,15 +364,15 @@ if __name__ == "__main__":
 
 	if True:
 		plt.figure(0)
-		for i in range(fish_count):
+		for i in range(cfg.fish_count):
 			plt.plot(Xall[i,:])
 		plt.title("X")
 		plt.figure(1)
-		for i in range(fish_count):
+		for i in range(cfg.fish_count):
 			plt.plot(Yall[i,:])
 		plt.title("Y")
 
-	#fix_id_switches()
+	fix_id_switches()
 
 	for switch in switch_array:
 			switch.display()
@@ -380,7 +387,7 @@ if __name__ == "__main__":
 	#for switch in switch_array:
 	#	switch.display()
 
-	utils.write_csv(switch_array, "csv_files/perim_switches_2.csv")
+	utils.write_csv(switch_array, "csv_files/perim_switches_"+filename+".csv")
 
 
 #use 3555-4814 frames

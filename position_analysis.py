@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import utility as utils
+import sys
 
-def find_skips_radial(X, Y, threshold, switch_array, index):
+def find_skips_radial(X, Y, threshold, switch_array, index, reject_frames):
 
 	#this array holds index positions where ID skips have taken place
 	skips = np.zeros(X.shape[0])
@@ -12,6 +13,8 @@ def find_skips_radial(X, Y, threshold, switch_array, index):
 	#scan X and Y vectors for skips
 
 	for i in range(0, X.shape[0]-1):
+		if i in reject_frames:
+			continue
 		#first make sure finite values are being dealt with
 		if X[i] != np.inf and X[i+1] != np.inf and Y[i] != np.inf and Y[i+1] != np.inf:
 			#if motion in one frame is abnormally large, register as ID skip
@@ -22,6 +25,39 @@ def find_skips_radial(X, Y, threshold, switch_array, index):
 				switch.set_fish(index, -1)
 
 				switch_array.append(switch)
+
+	return switch_array
+
+def find_inactivity_errors(switch_array, reject_frames):
+	inside_a_gap = False
+
+	for i in range(1,len(reject_frames)):
+		if reject_frames[i]:
+			if inside_a_gap:
+				continue
+			else:
+				# add an error object that signifies the start of
+				# inactivity interval
+				switch = utils.IdSwitch()
+				switch.set_type(0) #starts with -1
+				switch.set_frame(i)
+				switch.set_fish(-1, -1)
+
+				switch_array.append(switch)
+
+				inside_a_gap = True
+
+		elif inside_a_gap:
+			# add an error object that signifies the end of
+			# inactivity interval
+			switch = utils.IdSwitch()
+			switch.set_type(-1) #ends with 0
+			switch.set_frame(i-1)
+			switch.set_fish(-1, -1)
+
+			switch_array.append(switch)
+
+			inside_a_gap = False
 
 	return switch_array
 
@@ -36,12 +72,14 @@ def get_skip_count(skips, found_indices):
 
 def get_switches():
 
-	cfg = utils.Config("config_files/MVI_0248.csv")
+	filename = sys.argv[1]
+
+	cfg = utils.Config("config_files/"+filename+".csv")
 
 	max_fish_count = cfg.fish_count
 	jump_threshold = cfg.jump_thresh
 
-	Xall, Yall = utils.collate(cfg, fill_gaps=True)
+	Xall, _, reject_frames = utils.collate(cfg, fill_gaps=False)
 
 	switch_array = []
 
@@ -49,7 +87,7 @@ def get_switches():
 
 		X, Y, frame_vec = utils.load_position_file(cfg, count)
 
-		switch_array = find_skips_radial(X, Y, jump_threshold, switch_array, count)
+		switch_array = find_skips_radial(X, Y, jump_threshold, switch_array, count, reject_frames)
 
 		if False:
 			#plot X position data
@@ -70,6 +108,8 @@ def get_switches():
 			plt.xlabel("Frame #")
 			plt.ylabel("Ypos")
 
+	switch_array = find_inactivity_errors(switch_array, reject_frames)
+
 	switch_0 = utils.IdSwitch()
 	switch_0.frame_num = 0
 	switch_last = utils.IdSwitch()
@@ -86,7 +126,7 @@ def get_switches():
 	#for switch in switch_array:
 	#	switch.display()
 
-	#utils.write_csv(switch_array, "csv_files/posit_switches_2.csv")
+	utils.write_csv(switch_array, "csv_files/posit_switches_"+filename+".csv")
 
 	#plt.show()
 
