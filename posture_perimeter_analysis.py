@@ -2,6 +2,7 @@ import sys
 import numpy as np
 from random import random
 import matplotlib.pyplot as plt
+import matplotlib.path as pltPath
 import scipy.cluster.vq as vq
 import utility as utils
 #from scipy.cluster.hierarchy import fclusterdata
@@ -56,50 +57,14 @@ def get_perimeter(outline):
 
 	return sum(segment_lengths)
 
-def find_angles(slopes):
-
-	"""This function takes a periodic array of slopes and outputs
-	the corresponding array of angles the slopes make with the x axis.
-	These angles are continuous, ie they vary from theta->theta +/- pi"""
-
-	#first find straightforward arctan
-	tan_arr = np.arctan(slopes)
-
-	#this will be used to correct discontinuities in the arc tan output
-	increment = 0
-
-	for i in range(len(tan_arr)):
-
-		if tan_arr[i-1]-tan_arr[i] > np.pi*0.5: #if angles shifted down by pi
-			increment += np.pi
-		elif tan_arr[i-1]-tan_arr[i] < -np.pi*0.5: #if angles shifted up by pi
-			increment -= np.pi
-
-		tan_arr[i-1] += increment
-
-	return tan_arr
-
-def is_point_inside(outline, point):
-
-	"""This function checks if the given point is inside the given outline.
-	It uses the property that the rays connecting points on the outline with
-	the given point will wind around a circle once as we traverse the outline
-	iff the point is inside the outline, while if the point is outside, the
-	winding amount will be zero."""
-
-	slopes = (outline[:,1]-point[1])/(outline[:,0]-point[0])
-	slope_angle = find_angles(slopes)
-
-	return abs(slope_angle[-2]-slope_angle[0]) > np.pi*0.9
-
 def fill_points(outline):
 
 	"""This function takes in an array of points representing a continuous
 	and periodic outline of a body and outputs an array of points containting
 	the points of the outline along with randomly sampled points inside the outline."""
 
-	#newpoints = np.zeros((0,2))
-	newpoints = []
+	newpoints = np.zeros((0,2))
+	#newpoints = []
 
 	#used to sample random points inside the bounding box of the outline
 	minx = min(outline[:,0])
@@ -107,28 +72,35 @@ def fill_points(outline):
 	maxx = max(outline[:,0])
 	maxy = max(outline[:,1])
 
-	numpoints = int(2.5*(outline.shape[0]**0.5))
+	numpoints = int(2.5*outline.shape[0]**0.5)
 
 	xstep = (maxx-minx)/numpoints
 	ystep = (maxy-miny)/numpoints
 
-	#for i in range(3*outline.shape[0]):
-	for i in range(numpoints):
-		newpoint = np.zeros(2)
-		newpoint[0] = minx + i*xstep
-		for j in range(numpoints):
+	gridpoints = np.mgrid[minx:maxx:xstep,miny:maxy:ystep]
+	gridpoints = gridpoints.reshape((2,gridpoints.shape[1]*gridpoints.shape[2])).T
 
-			newpoint[1] = miny + j*ystep
+	path = pltPath.Path(outline)
+	inside = path.contains_points(gridpoints)
+	inside_points = gridpoints[inside,:]
 
-			if is_point_inside(outline, newpoint):
-				#newpoints = np.append(newpoints, [newpoint], axis=0)
-				newpoints.append(newpoint)
+	return inside_points
 
-	return np.array(newpoints)
+def plot_posture_points(outline, points, centroids):
+	#print(points)
+	print(outline.shape)
+	print(points.shape)
+	#print(points)
+	plt.figure(1)
+	plt.scatter(outline[:,0], outline[:,1])
+	plt.scatter(points[:,0], points[:,1])
+	plt.scatter(centroids[:,0], centroids[:,1])
+	#plt.plot(centroids[0,:], centroids[1,:])
+	plt.show()
 
 def replace_with_kmeans_centroid(outline, i):
 
-	global offsets
+	#global offsets
 
 	#holds the centroid of the posture (non-weighted)
 	centroid = np.zeros(2)
@@ -153,6 +125,8 @@ def replace_with_kmeans_centroid(outline, i):
 
 	#line with centroids of 2 clusters
 	line2, _ = vq.kmeans(newpoints, 2)
+
+	plot_posture_points(outline, newpoints, line2)
 
 	unmerge(line2, posture_frames[i])
 
@@ -324,7 +298,7 @@ if __name__ == "__main__":
 
 	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
 
-	if True:
+	if False:
 		plt.figure(0)
 		for i in range(cfg.fish_count):
 			plt.plot(Xall[i,:])
