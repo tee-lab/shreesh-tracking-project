@@ -36,13 +36,8 @@ def get_nearest(fish_listX, fish_listY, x, y):
 	return np.argsort(dists)[1]
 
 def find_inactive_fish(fish_list):
-	inactive_indices = []
-
-	for i in range(len(fish_list)):
-		if fish_list[i] == np.inf:
-			inactive_indices.append(i)
-
-	return inactive_indices
+	finite_indices = np.isfinite(fish_list)
+	return np.where(finite_indices == False)[0]
 
 def get_perimeter(outline):
 
@@ -126,7 +121,7 @@ def replace_with_kmeans_centroid(outline, i):
 	#line with centroids of 2 clusters
 	line2, _ = vq.kmeans(newpoints, 2)
 
-	plot_posture_points(outline, newpoints, line2)
+	#plot_posture_points(outline, newpoints, line2)
 
 	unmerge(line2, posture_frames[i])
 
