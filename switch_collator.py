@@ -10,7 +10,7 @@ def onclick(event):
 		('double' if event.dblclick else 'single', event.button,
 		event.x, event.y, event.xdata, event.ydata))
 
-def make_histogram(switch_array_1, switch_array_2, switch_array, plotcolor="blue"):
+def make_histogram(switch_array, axis=None, type="by_frame"):
 	del_t = []
 	t = [0]
 
@@ -24,50 +24,56 @@ def make_histogram(switch_array_1, switch_array_2, switch_array, plotcolor="blue
 
 	t.sort()
 
-	#plt.figure(1)
-	fig, ax = plt.subplots()
-	ax.bar(t[1:],del_t,width=100, color=plotcolor)
-	plt.title("ID Switch locations in video")
-	plt.xlabel("Frame stamp")
-	plt.ylabel("Length of errorless tracking interval")
-	cid = fig.canvas.mpl_connect('button_press_event', onclick)
+	if axis == None:
+		if type=="by_frame":
+			fig, axis = plt.subplots()
+			axis.bar(t[1:],del_t,width=25, color="blue")
+			plt.title("ID Switch locations in video")
+			plt.xlabel("Frame stamp")
+			plt.ylabel("Length of errorless tracking interval")
+		else:
+			fig, axis = plt.subplots()
+			axis.bar(range(1,len(switch_array)),del_t, color="blue")
+			plt.title("Time differences between two switches")
+			plt.ylabel("Length of errorless tracking intervals")
+			plt.xlabel("ID Switch number")
 
-	#plt.figure(2)
-	fig, ax = plt.subplots()
-	plt.bar(range(1,len(switch_array)),del_t, color=plotcolor)
-	plt.title("Time differences between two switches")
-	plt.ylabel("Length of errorless tracking intervals")
-	plt.xlabel("ID Switch number")
-	cid = fig.canvas.mpl_connect('button_press_event', onclick)
-
-	del_t.sort()
-	print("Differences:")
-	print(del_t)
-	print("Framestamps:")
-	print(t)
-	print("Switches: ", len(switch_array)-2)
-	plt.show()
-
-def analyze(filename):
-	if True:
-		switch_array_1 = utils.read_csv("csv_files/posit_switches_"+filename+".csv")
-		switch_array_2 = utils.read_csv("csv_files/perim_switches_"+filename+".csv")
-
-		switch_array = []
-		for switch in switch_array_1:
-			switch_array.append(switch)
-
-		for switch in switch_array_2:
-			switch_array.append(switch)
-
-		switch_array.sort(key = lambda x: x.frame_num)
-
-		utils.write_csv(switch_array, "csv_files/all_switches_"+filename+".csv")
+		cid = fig.canvas.mpl_connect('button_press_event', onclick)
 
 	else:
-		switch_array = utils.read_csv("csv_files/all_switches_"+filename+".csv")
+		if type=="by_frame":
+			axis.bar(t[1:],del_t,width=25, color="red")
+		else:
+			axis.bar(range(1,len(switch_array)),del_t, color="red")
+	# #plt.figure(2)
 
-	make_histogram([], [], switch_array)
+	return axis
+
+def analyze(filename):
+	switch_array_1 = utils.read_csv("csv_files/posit_switches_"+filename+".csv")
+	switch_array_2 = utils.read_csv("csv_files/perim_switches_"+filename+".csv")
+
+	switch_array = []
+	for switch in switch_array_1:
+		switch_array.append(switch)
+
+	for switch in switch_array_2:
+		switch_array.append(switch)
+
+	switch_array.sort(key = lambda x: x.frame_num)
+
+	utils.write_csv(switch_array, "csv_files/all_switches_"+filename+".csv")
+	#switch_array = utils.read_csv("csv_files/all_switches_"+filename+".csv")
+
+	ax1 = make_histogram(switch_array_1, type="by_frame")
+	make_histogram(switch_array_2, axis=ax1, type="by_frame")
+
+	ax2 = make_histogram(switch_array_1, type="by_index")
+	make_histogram(switch_array_2, axis=ax2, type="by_index")
+
+	make_histogram(switch_array, type="by_frame")
+	make_histogram(switch_array, type="by_index")
+	plt.show()
 
 if __name__ == "__main__":
 	filename = sys.argv[1]

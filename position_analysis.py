@@ -13,7 +13,7 @@ def find_skips_radial(X, Y, threshold, switch_array, index, reject_frames):
 	#scan X and Y vectors for skips
 
 	for i in range(0, X.shape[0]-1):
-		if i in reject_frames:
+		if reject_frames[i]:
 			continue
 		#first make sure finite values are being dealt with
 		if X[i] != np.inf and X[i+1] != np.inf and Y[i] != np.inf and Y[i+1] != np.inf:
@@ -39,7 +39,7 @@ def find_inactivity_errors(switch_array, reject_frames):
 				# add an error object that signifies the start of
 				# inactivity interval
 				switch = utils.IdSwitch()
-				switch.set_type(0) #starts with -1
+				switch.set_type(0) #starts with 0
 				switch.set_frame(i)
 				switch.set_fish(-1, -1)
 
@@ -51,7 +51,7 @@ def find_inactivity_errors(switch_array, reject_frames):
 			# add an error object that signifies the end of
 			# inactivity interval
 			switch = utils.IdSwitch()
-			switch.set_type(-1) #ends with 0
+			switch.set_type(-1) #ends with -1
 			switch.set_frame(i-1)
 			switch.set_fish(-1, -1)
 
@@ -112,8 +112,10 @@ def get_switches():
 
 	switch_0 = utils.IdSwitch()
 	switch_0.frame_num = 0
+	switch_0.type = -2
 	switch_last = utils.IdSwitch()
-	switch_last.frame_num = Xall.shape[1]
+	switch_last.frame_num = Xall.shape[1]-1
+	switch_last.type = -2
 	switch_array.append(switch_0)
 	switch_array.append(switch_last)
 
@@ -123,12 +125,7 @@ def get_switches():
 	for switch in switch_array:
 		switch.display()
 
-	#for switch in switch_array:
-	#	switch.display()
-
 	utils.write_csv(switch_array, "csv_files/posit_switches_"+filename+".csv")
-
-	#plt.show()
 
 if __name__ == "__main__":
 	get_switches()

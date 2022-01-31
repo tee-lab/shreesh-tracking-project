@@ -68,6 +68,22 @@ class IdSwitch:
 			'Fish1': str(self.fish1),\
 			'Fish2': str(self.fish2)}
 
+def get_distance(x1, y1, x2, y2):
+	return ( (x2-x1)**2 + (y2-y1)**2 )**0.5
+
+def get_perimeter(outline):
+
+	"""This function takes in an outline (periodic) and outputs its perimeter."""
+
+	#to store periodic version of outline for processing purposes
+	outline_new = np.zeros((outline.shape[0]+1,2))
+	outline_new[-1,:] = outline[0,:]
+	outline_new[0:-1,:] = outline
+
+	segment_lengths = get_distance(outline_new[0:-1,0], outline_new[0:-1,1], outline_new[1:,0], outline_new[1:,1])
+
+	return sum(segment_lengths)
+
 def write_csv(switch_array, filename):
 
 	dict_list = []
@@ -221,7 +237,7 @@ def collate(config_file, fill_gaps=False):
 		reject_frames = np.zeros(max_frames, dtype=bool)
 
 		for i in range(max_frames):
-			if sum(missing_all[:,i]) > 2:
+			if sum(missing_all[:,i]) > 3:
 				reject_frames[i] = True
 
 	return Xall, Yall, reject_frames
