@@ -1,65 +1,65 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import utility as utils
+import sys
 
-def load_file(fish_filename):
-	#load the npz file of the given fish
-	npz = np.load(fish_filename)
-	
-	#extract X, Y position data
-	X = npz["X#wcentroid"]
-	Y = npz["Y#wcentroid"]
-	
-	#get the vector representing the frames of the video
-	frame_vec = npz["frame"]
-	
-	return X, Y, frame_vec
+def find_skips_radial(X, Y, threshold, switch_array, index, reject_frames):
 
-def find_skips(X, Y, threshold, found_indices):
-	
 	#this array holds index positions where ID skips have taken place
 	skips = np.zeros(X.shape[0])
-	
-	skip_count = 0
-	
-	#scan X and Y vectors for skips
-	
-	for i in range(0, X.shape[0]-1):
-		#first make sure finite values are being dealt with
-		if X[i] != np.inf and X[i+1] != np.inf:
-			#if motion in one frame is abnormally large, register as ID skip
-			if abs(X[i+1] - X[i]) > threshold and skips[i] != 1:
-				skips[i] = 1
-				skip_count += 1
-				found_indices.append(i)
-	
-	for i in range(0, Y.shape[0]-1):
-		if Y[i] != np.inf and Y[i+1] != np.inf:
-			if abs(Y[i+1] - Y[i]) > threshold and skips[i] != 1:
-				skips[i] = 1
-				skip_count += 1
-				found_indices.append(i)
-	
-	return skips, skip_count, found_indices
 
-def find_skips_radial(X, Y, threshold, found_indices):
-	
-	#this array holds index positions where ID skips have taken place
-	skips = np.zeros(X.shape[0])
-	
 	skip_count = 0
-	
+
 	#scan X and Y vectors for skips
-	
+
 	for i in range(0, X.shape[0]-1):
+		if reject_frames[i]:
+			continue
 		#first make sure finite values are being dealt with
 		if X[i] != np.inf and X[i+1] != np.inf and Y[i] != np.inf and Y[i+1] != np.inf:
 			#if motion in one frame is abnormally large, register as ID skip
-			if np.sqrt((X[i+1] - X[i])**2 + (Y[i+1] - Y[i])**2) > threshold and skips[i] != 1:
-				skips[i] = 1
-				skip_count += 1
-				found_indices.append(i)
-	
-	return skips, skip_count, found_indices
+			if np.sqrt((X[i+1] - X[i])**2 + (Y[i+1] - Y[i])**2) > threshold:
+				switch = utils.IdSwitch()
+				switch.set_type(1)
+				switch.set_frame(i)
+				switch.set_fish(index, -1)
+
+				switch_array.append(switch)
+
+	return switch_array
+
+def find_inactivity_errors(switch_array, reject_frames):
+	inside_a_gap = False
+
+	for i in range(1,len(reject_frames)):
+		if reject_frames[i]:
+			if inside_a_gap:
+				continue
+			else:
+				# add an error object that signifies the start of
+				# inactivity interval
+				switch = utils.IdSwitch()
+				switch.set_type(0) #starts with 0
+				switch.set_frame(i)
+				switch.set_fish(-1, -1)
+
+				switch_array.append(switch)
+
+				inside_a_gap = True
+
+		elif inside_a_gap:
+			# add an error object that signifies the end of
+			# inactivity interval
+			switch = utils.IdSwitch()
+			switch.set_type(-1) #ends with -1
+			switch.set_frame(i-1)
+			switch.set_fish(-1, -1)
+
+			switch_array.append(switch)
+
+			inside_a_gap = False
+
+	return switch_array
 
 def get_skip_count(skips, found_indices):
 	count = 0
@@ -67,114 +67,65 @@ def get_skip_count(skips, found_indices):
 		if i not in found_indices and skips[i] == 1:
 			count += 1
 			found_indices.append(i)
-	
+
 	return count, found_indices
 
-def fill_in_gaps(X):
-	
-	#bool value to remember if currently inside a gap	
-	inside_a_gap = False
-	#ideally should be 0, but have to consider the edge case
-	#of a body starting out in the inactive state
-	first_active_index = -1
-	
-	#iterate up to the first finite value (ie when fish is first active)
-	for i in range(len(X)):
-		if X[i] != np.inf:
-			first_active_index = i
-			break
-	
-	#this value is used to remember the last index
-	#where the fish was active
-	last_active_index = first_active_index
-	
-	for i in range(first_active_index, len(X)):
-		
-		if inside_a_gap:
-			
-			#if gap is complete, fill it in using linear interpolation
-			if X[i] != np.inf:
-				
-				#increment per frame
-				increment = (X[i] - X[last_active_index])/(i - last_active_index)
-				
-				#now perform linear interpolation to fill in the gaps
-				for j in range(last_active_index+1, i):
-					X[j] = X[last_active_index] + (j-last_active_index)*increment
-				
-				inside_a_gap = False
-			
-			else:
-				continue
-		
-		#if non-finite value encountered, you have entered a gap
-		elif X[i] == np.inf:
-			inside_a_gap = True
-			last_active_index = i-1
-		else:
-			continue
-	
-	return X
+def get_switches():
 
-def moving_average(X, span):
-	return np.convolve(X, np.ones(span), 'valid') / span			
+	filename = sys.argv[1]
 
-def main():
-	
-	#set this as the path to the directory holding the .npz files
-	abs_path = "./data/"
-	video_filename = "30_fish.MOV"
+	cfg = utils.Config("config_files/"+filename+".csv")
 
-	max_fish_count = 1
+	max_fish_count = cfg.fish_count
+	jump_threshold = cfg.jump_thresh
 
-	#this is the max possible legitimate displacement in one frame
-	#any motion greater than this value is marked as an ID skip
-	skip_threshold = 0.5
+	Xall, _, reject_frames = utils.collate(cfg, fill_gaps=False)
 
-	total_skip_count = 0
-	skip_positions = []
-	
+	switch_array = []
+
 	for count in range(0, max_fish_count):
-		
-		fish_filename = abs_path + video_filename + "_fish" + str(count) + ".npz"
-		
-		X, Y, frame_vec = load_file(fish_filename)
-		
-		#X = fill_in_gaps(X)
-		#Y = fill_in_gaps(Y)
-		
-		skips, current_skip_count, skip_positions = find_skips_radial(X, Y, skip_threshold, skip_positions)
-		
-		#current_skip_count, skip_positions = get_skip_count(skips, skip_positions)
-		
-		total_skip_count += current_skip_count
-		
-		#plot X position data
-		plt.figure(1)
-		plt.plot(frame_vec, X)
-		#plt.plot(frame_vec[skips.astype(bool)], X[skips.astype(bool)])
-		plt.plot(frame_vec, skips*20)
-		plt.title("X position and skips vs Frames")
-		plt.xlabel("Frame #")
-		plt.ylabel("Xpos")
-		
-		#plot Y position data
-		plt.figure(2)
-		plt.plot(frame_vec, Y)
-		plt.plot(frame_vec, skips*20)
-		#plt.plot(frame_vec[skips.astype(bool)], Y[skips.astype(bool)])
-		plt.title("Y position and skips vs Frames")
-		plt.xlabel("Frame #")
-		plt.ylabel("Ypos")
 
-	print("Total skip count is: " + str(total_skip_count))
+		X, Y, frame_vec = utils.load_position_file(cfg, count)
+
+		switch_array = find_skips_radial(X, Y, jump_threshold, switch_array, count, reject_frames)
+
+		if False:
+			#plot X position data
+			plt.figure(1)
+			plt.plot(frame_vec, X)
+			#plt.plot(frame_vec[skips.astype(bool)], X[skips.astype(bool)])
+			plt.plot(frame_vec, skips*20)
+			plt.title("X position and skips vs Frames")
+			plt.xlabel("Frame #")
+			plt.ylabel("Xpos")
+
+			#plot Y position data
+			plt.figure(2)
+			plt.plot(frame_vec, Y)
+			plt.plot(frame_vec, skips*20)
+			#plt.plot(frame_vec[skips.astype(bool)], Y[skips.astype(bool)])
+			plt.title("Y position and skips vs Frames")
+			plt.xlabel("Frame #")
+			plt.ylabel("Ypos")
+
+	switch_array = find_inactivity_errors(switch_array, reject_frames)
+
+	switch_0 = utils.IdSwitch()
+	switch_0.frame_num = 0
+	switch_0.type = -2
+	switch_last = utils.IdSwitch()
+	switch_last.frame_num = Xall.shape[1]-1
+	switch_last.type = -2
+	switch_array.append(switch_0)
+	switch_array.append(switch_last)
+
+	print("Total skip count is: ", len(switch_array))
 	print("Skips happened at frames:")
-	skip_positions = list(set(skip_positions))
-	skip_positions.sort()
-	print(skip_positions)
-	
-	plt.show()
+	switch_array.sort(key = lambda x: x.frame_num)
+	for switch in switch_array:
+		switch.display()
+
+	utils.write_csv(switch_array, "csv_files/posit_switches_"+filename+".csv")
 
 if __name__ == "__main__":
-    main()
-	
+	get_switches()

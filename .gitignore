@@ -1,0 +1,7 @@
+__pycache__/*
+*.pv
+*.mp4
+*.png
+*.sh
+*~
+*.idea
