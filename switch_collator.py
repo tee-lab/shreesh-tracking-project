@@ -11,41 +11,27 @@ def onclick(event):
 		event.x, event.y, event.xdata, event.ydata))
 
 def make_histogram(switch_array):
-	del_t = []
-	del_t_1 = []
-	del_t_2 = []
-	t = []
+
 	t_1 = []
-	t_2 = []
+	del_t_1 = []
 	del_t_1_indices = []
+
+	t_2 = []
+	del_t_2 = []
 	del_t_2_indices = []
 
 	for i in range(1,len(switch_array)):
 
 		diff = switch_array[i].frame_num - switch_array[i-1].frame_num
 
-		if switch_array[i].type == 1:
-			t_1.append(switch_array[i].frame_num)
-			del_t_1.append(diff)
-			del_t_1_indices.append(i)
-			del_t.append(diff)
-		elif switch_array[i].type == 2:
+		if switch_array[i].type == 2:
 			t_2.append(switch_array[i].frame_num)
 			del_t_2.append(diff)
 			del_t_2_indices.append(i)
-			del_t.append(diff)
-		elif switch_array[i].type == -1:
-			t_1.append(switch_array[i].frame_num)
-			del_t_1.append(-diff)
-			del_t_1_indices.append(i)
-			del_t.append(-diff)
 		else:
 			t_1.append(switch_array[i].frame_num)
-			del_t_1.append(diff)
+			del_t_1.append(-diff if switch_array[i].type == -1 else diff)
 			del_t_1_indices.append(i)
-			del_t.append(diff)
-
-		t.append(switch_array[i].frame_num)
 
 	fig, axis = plt.subplots()
 	axis.bar(t_1, del_t_1, width=25, color="red", label="Type 1 errors")
