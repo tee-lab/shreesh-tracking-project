@@ -272,6 +272,7 @@ if __name__ == "__main__":
 	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
 
 	if False:
+    
 		plt.figure(0)
 		for i in range(cfg.fish_count):
 			plt.plot(Xall[i,:])
