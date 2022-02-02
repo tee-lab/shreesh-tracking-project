@@ -10,7 +10,9 @@ def onclick(event):
 		('double' if event.dblclick else 'single', event.button,
 		event.x, event.y, event.xdata, event.ydata))
 
-def make_histogram(switch_array, removed_switches):
+def make_histogram(switch_array, removed_switches, filename):
+
+	del_t = []
 
 	t_1 = []
 	del_t_1 = []
@@ -35,6 +37,8 @@ def make_histogram(switch_array, removed_switches):
 			del_t_1.append(-diff if switch_array[i].type == -1 else diff)
 			del_t_1_indices.append(i)
 
+		del_t.append(diff)
+
 	for i in range(len(removed_switches)):
 		removed_indices.append(removed_switches[i].frame_num)
 
@@ -42,7 +46,7 @@ def make_histogram(switch_array, removed_switches):
 	axis.bar(t_1, del_t_1, width=25, color="red", label="Type 0 and 1 errors")
 	axis.bar(t_2, del_t_2, width=25, color="blue", label="Type 2 errors")
 	axis.bar(removed_indices, -50, width=25, color="green", label="Removed errors")
-	plt.title("ID Switch locations in video")
+	plt.title("ID Switch locations in video "+filename)
 	plt.xlabel("Frame stamp")
 	plt.ylabel("Length of errorless tracking interval")
 	plt.legend(loc="upper right")
@@ -51,11 +55,17 @@ def make_histogram(switch_array, removed_switches):
 	fig, axis = plt.subplots()
 	axis.bar(del_t_1_indices, del_t_1, color="red", label="Type 0 and 1 errors")
 	axis.bar(del_t_2_indices, del_t_2, color="blue", label="Type 2 errors")
-	plt.title("Time differences between two switches")
+	plt.title("Time differences between two switches in video "+filename)
 	plt.ylabel("Length of errorless tracking intervals")
 	plt.xlabel("ID Switch number")
 	plt.legend(loc="upper right")
 	cid = fig.canvas.mpl_connect('button_press_event', onclick)
+
+	fig, axis = plt.subplots()
+	axis.hist(del_t, bins=20)
+	plt.title("Time interval frequencies in video "+filename)
+	plt.xlabel("Frequency")
+	plt.ylabel("Length of tracking interval")
 
 def analyze(filename, to_collate_to_csv):
 
@@ -79,7 +89,7 @@ def analyze(filename, to_collate_to_csv):
 
 	removed_switches = utils.read_csv("csv_files/"+filename+"/removed_perim_switches_"+filename+".csv")
 
-	make_histogram(switch_array, removed_switches)
+	make_histogram(switch_array, removed_switches, filename)
 	plt.show()
 
 if __name__ == "__main__":
