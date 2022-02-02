@@ -125,7 +125,7 @@ def get_switches():
 	for switch in switch_array:
 		switch.display()
 
-	utils.write_csv(switch_array, "csv_files/posit_switches_"+filename+".csv")
+	utils.write_csv(switch_array, "csv_files/"+filename+"/posit_switches_"+filename+".csv")
 
 if __name__ == "__main__":
 	get_switches()

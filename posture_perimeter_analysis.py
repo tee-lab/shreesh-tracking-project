@@ -336,8 +336,8 @@ if __name__ == "__main__":
 	#for switch in switch_array:
 	#	switch.display()
 
-	utils.write_csv(switch_array, "csv_files/perim_switches_"+filename+".csv")
-	utils.write_csv(removed, "csv_files/removed_perim_switches_"+filename+".csv")
+	utils.write_csv(switch_array, "csv_files/"+filename+"/perim_switches_"+filename+".csv")
+	utils.write_csv(removed, "csv_files/"+filename+"/removed_perim_switches_"+filename+".csv")
 
 
 #use 3555-4814 frames

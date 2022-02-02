@@ -1,6 +1,7 @@
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
+import sys
 
 class Config:
 	"""A class that defines config entries and whose objects are
@@ -243,6 +244,19 @@ def collate(config_file, fill_gaps=False):
 	return Xall, Yall, reject_frames
 
 if __name__=="__main__":
+	filename = sys.argv[1]
+
+	cfg = Config("config_files/"+filename+".csv")
+
+	Xall, Yall, _ = collate(cfg, fill_gaps=False)
+
+	# Xall_new = np.zeros((Xall.shape[0]-1, Xall.shape[1]))
+	# Yall_new = np.zeros((Xall.shape[0]-1, Xall.shape[1]))
+
+	Xall_new = Xall[1:,:]
+	Yall_new = Yall[1:,:]
+
+	np.savez("posAll_"+filename+".npz", Xall=Xall_new, Yall=Yall_new)
 	#read_csv()
 	exit()
 	#write_csv()

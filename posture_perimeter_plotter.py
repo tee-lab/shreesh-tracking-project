@@ -3,25 +3,11 @@ import matplotlib.pyplot as plt
 import utility as utils
 import sys
 
-posture_frames = np.array(1)
-outlines = np.array(1)
-
-outline_lengths = np.array(1)
-
-outline_iterator = 0
-
-X = 1
-Y = 1
-
-posture_frames = []
-frames_array = []
-current_fish_count = -1
-
-cm_per_pixel = 0.02
-
 def get_perims(config_file, count):
 
-	outlines, outline_lengths, _, _ = utils.load_posture_file(config_file, count)
+	outlines, outline_lengths, _, posture_frames = utils.load_posture_file(config_file, count)
+
+	_, _, reject_frames = utils.collate(config_file)
 
 	outline_iterator = 0
 	perims = np.zeros(outline_lengths.shape)
@@ -30,9 +16,11 @@ def get_perims(config_file, count):
 
 		outline_iterator_next = outline_iterator + int(outline_lengths[i])
 
-		outline_slice = outlines[outline_iterator:outline_iterator_next, :]
-
-		perims[i] = utils.get_perimeter(outline_slice)
+		if not (posture_frames[i] >= len(reject_frames) or reject_frames[posture_frames[i]]):
+			outline_slice = outlines[outline_iterator:outline_iterator_next, :]
+			perims[i] = utils.get_perimeter(outline_slice)
+		else:
+			perims[i] = 0
 
 		outline_iterator = outline_iterator_next
 
@@ -82,6 +70,3 @@ if __name__ == "__main__":
 	plot_perims(cfg)
 	plot_skips(cfg)
 	plt.show()
-
-	#perimeter: 0.75
-	#skip: 0.55
