@@ -1,5 +1,3 @@
-import posture_perimeter_analysis as perim
-import position_analysis as posit
 import utility as utils
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +8,7 @@ def onclick(event):
 		('double' if event.dblclick else 'single', event.button,
 		event.x, event.y, event.xdata, event.ydata))
 
-def make_histogram(switch_array, removed_switches, filename):
+def make_histogram(switch_array, filename):
 
 	del_t = []
 
@@ -21,8 +19,6 @@ def make_histogram(switch_array, removed_switches, filename):
 	t_2 = []
 	del_t_2 = []
 	del_t_2_indices = []
-
-	removed_indices = []
 
 	for i in range(1,len(switch_array)):
 
@@ -39,13 +35,9 @@ def make_histogram(switch_array, removed_switches, filename):
 
 		del_t.append(diff)
 
-	for i in range(len(removed_switches)):
-		removed_indices.append(removed_switches[i].frame_num)
-
 	fig, axis = plt.subplots()
 	axis.bar(t_1, del_t_1, width=25, color="red", label="Type 0 and 1 errors")
 	axis.bar(t_2, del_t_2, width=25, color="blue", label="Type 2 errors")
-	axis.bar(removed_indices, -50, width=25, color="green", label="Removed errors")
 	plt.title("ID Switch locations in video "+filename)
 	plt.xlabel("Frame stamp")
 	plt.ylabel("Length of errorless tracking interval")
@@ -70,32 +62,13 @@ def make_histogram(switch_array, removed_switches, filename):
 	plt.xlabel("Length of tracking interval in seconds")
 	plt.ylabel("Frequency")
 
-def analyze(filename, to_collate_to_csv):
+def analyze(filename):
 
-	if to_collate_to_csv:
-		switch_array_1 = utils.read_csv("csv_files/"+filename+"/posit_switches_"+filename+".csv")
-		switch_array_2 = utils.read_csv("csv_files/"+filename+"/perim_switches_"+filename+".csv")
+	switch_array = utils.read_csv("csv_files/"+filename+"/manual_switches_"+filename+".csv")
 
-		switch_array = []
-		for switch in switch_array_1:
-			switch_array.append(switch)
-
-		for switch in switch_array_2:
-			switch_array.append(switch)
-
-		switch_array.sort(key = lambda x: x.frame_num)
-
-		utils.write_csv(switch_array, "csv_files/"+filename+"/all_switches_"+filename+".csv")
-
-	else:
-		switch_array = utils.read_csv("csv_files/"+filename+"/all_switches_"+filename+".csv")
-
-	removed_switches = utils.read_csv("csv_files/"+filename+"/removed_perim_switches_"+filename+".csv")
-
-	make_histogram(switch_array, removed_switches, filename)
+	make_histogram(switch_array, filename)
 	plt.show()
 
 if __name__ == "__main__":
 	filename = sys.argv[1]
-	to_collate_to_csv = sys.argv[2] == "yes"
-	analyze(filename, to_collate_to_csv)
+	analyze(filename)
