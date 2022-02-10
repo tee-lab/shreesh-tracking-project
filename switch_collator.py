@@ -27,6 +27,7 @@ def make_histogram(switch_array, removed_switches, filename):
 	for i in range(1,len(switch_array)):
 
 		diff = switch_array[i].frame_num - switch_array[i-1].frame_num
+		diff = -diff if switch_array[i].type == -1 else diff
 
 		if switch_array[i].type == 2:
 			t_2.append(switch_array[i].frame_num)
@@ -34,7 +35,7 @@ def make_histogram(switch_array, removed_switches, filename):
 			del_t_2_indices.append(i)
 		else:
 			t_1.append(switch_array[i].frame_num)
-			del_t_1.append(-diff if switch_array[i].type == -1 else diff)
+			del_t_1.append(diff)
 			del_t_1_indices.append(i)
 
 		del_t.append(diff)
@@ -42,13 +43,18 @@ def make_histogram(switch_array, removed_switches, filename):
 	for i in range(len(removed_switches)):
 		removed_indices.append(removed_switches[i].frame_num)
 
+	del_t_1 = np.array(del_t_1)
+	del_t_2 = np.array(del_t_2)
+
+	framerate = 25
+
 	fig, axis = plt.subplots()
-	axis.bar(t_1, del_t_1, width=25, color="red", label="Type 0 and 1 errors")
-	axis.bar(t_2, del_t_2, width=25, color="blue", label="Type 2 errors")
-	axis.bar(removed_indices, -50, width=25, color="green", label="Removed errors")
+	axis.bar(t_1, del_t_1/framerate, width=25, color="red", label="Type 0 and 1 errors")
+	axis.bar(t_2, del_t_2/framerate, width=25, color="blue", label="Type 2 errors")
+	axis.bar(removed_indices, -2, width=25, color="green", label="Removed errors")
 	plt.title("ID Switch locations in video "+filename)
 	plt.xlabel("Frame stamp")
-	plt.ylabel("Length of errorless tracking interval")
+	plt.ylabel("Length of errorless tracking interval (in s)")
 	plt.legend(loc="upper right")
 	cid = fig.canvas.mpl_connect('button_press_event', onclick)
 
@@ -62,7 +68,6 @@ def make_histogram(switch_array, removed_switches, filename):
 	cid = fig.canvas.mpl_connect('button_press_event', onclick)
 
 	fig, axis = plt.subplots()
-	framerate = 25
 	del_t = np.array(del_t)
 	del_t = del_t[del_t>(framerate*5)]
 	axis.hist(del_t/framerate, bins=40)
@@ -97,5 +102,5 @@ def analyze(filename, to_collate_to_csv):
 
 if __name__ == "__main__":
 	filename = sys.argv[1]
-	to_collate_to_csv = sys.argv[2] == "yes"
+	to_collate_to_csv = sys.argv[2] == "yes" or sys.argv[2] == "y"
 	analyze(filename, to_collate_to_csv)
