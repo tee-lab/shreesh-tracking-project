@@ -245,7 +245,7 @@ def perim_threshold(do_what, threshold):
 
 		outline_iterator_next = outline_iterator + int(outline_lengths[i])
 
-		if not(reject_frames[posture_frames[i]] or posture_frames[i] >= Xall.shape[1]):
+		if not(posture_frames[i] >= Xall.shape[1] or reject_frames[posture_frames[i]]):
 
 			outline_slice = outlines[outline_iterator:outline_iterator_next, :]
 
@@ -272,7 +272,7 @@ if __name__ == "__main__":
 	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
 
 	if False:
-    
+
 		plt.figure(0)
 		for i in range(cfg.fish_count):
 			plt.plot(Xall[i,:])
@@ -291,7 +291,9 @@ if __name__ == "__main__":
 
 		outlines, outline_lengths, offsets, posture_frames = utils.load_posture_file(cfg, count)
 
-		X, Y, _ = utils.load_position_file(cfg, count)
+		#X, Y, _ = utils.load_position_file(cfg, count)
+		X = Xall[count,:]
+		Y = Yall[count,:]
 
 		current_fish_index = count
 

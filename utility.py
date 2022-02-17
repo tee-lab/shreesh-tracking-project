@@ -238,9 +238,9 @@ def collate(config_file, fill_gaps=False):
 			X = fill_in_gaps(X)
 			Y = fill_in_gaps(Y)
 
-		Xall[count, int(frame_array[0]):int(frame_array[-1])+1] = X[start_frame:int(frame_array[-1])+1]
-		Yall[count, int(frame_array[0]):int(frame_array[-1])+1] = Y[start_frame:int(frame_array[-1])+1]
-		missing_all[count, int(frame_array[0]):int(frame_array[-1])+1] = missing[start_frame:int(frame_array[-1])+1]
+		Xall[count, int(frame_array[0])-start_frame:int(frame_array[-1])+1] = X
+		Yall[count, int(frame_array[0])-start_frame:int(frame_array[-1])+1] = Y
+		missing_all[count, int(frame_array[0])-start_frame:int(frame_array[-1])+1] = missing
 
 	if fill_gaps:
 		reject_frames = []

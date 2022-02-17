@@ -85,7 +85,9 @@ def get_switches():
 
 	for count in range(0, max_fish_count):
 
-		X, Y, frame_vec = utils.load_position_file(cfg, count)
+		#X, Y, frame_vec = utils.load_position_file(cfg, count)
+		X = Xall[count,:]
+		Y = Yall[count,:]
 
 		switch_array = find_skips_radial(X, Y, jump_threshold, switch_array, count, reject_frames)
 
