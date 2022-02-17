@@ -200,7 +200,8 @@ def fill_in_gaps(X):
 
 def collate(config_file, fill_gaps=False):
 
-	max_frames = 0
+	start_frame = np.inf
+	end_frame = 0
 
 	for i in range(config_file.fish_count):
 		filename = config_file.video_dir +\
@@ -208,12 +209,21 @@ def collate(config_file, fill_gaps=False):
 
 		npz = np.load(filename)
 
-		curr_frames = len(npz["frame"])
-		max_frames = max_frames if max_frames > curr_frames else curr_frames
+		frames = npz["frame"]
 
-	Xall = np.zeros((config_file.fish_count, max_frames)) + np.inf
-	Yall = np.zeros((config_file.fish_count, max_frames)) + np.inf
-	missing_all = np.zeros((config_file.fish_count, max_frames), dtype=bool) + 1
+		curr_end_frame = frames[-1]
+		curr_start_frame = frames[0]
+
+		end_frame = end_frame if end_frame > curr_end_frame else curr_end_frame
+		start_frame = start_frame if start_frame < curr_start_frame else curr_start_frame
+
+	start_frame = int(start_frame)
+	end_frame = int(end_frame)
+	total_frames = int(end_frame-start_frame+1)
+
+	Xall = np.zeros((config_file.fish_count, total_frames)) + np.inf
+	Yall = np.zeros((config_file.fish_count, total_frames)) + np.inf
+	missing_all = np.zeros((config_file.fish_count, total_frames), dtype=bool) + 1
 
 	for count in range(config_file.fish_count):
 		filename = config_file.video_dir +\
@@ -228,16 +238,16 @@ def collate(config_file, fill_gaps=False):
 			X = fill_in_gaps(X)
 			Y = fill_in_gaps(Y)
 
-		Xall[count, int(frame_array[0]):int(frame_array[-1])+1] = X
-		Yall[count, int(frame_array[0]):int(frame_array[-1])+1] = Y
-		missing_all[count, int(frame_array[0]):int(frame_array[-1])+1] = missing
+		Xall[count, int(frame_array[0]):int(frame_array[-1])+1] = X[start_frame:int(frame_array[-1])+1]
+		Yall[count, int(frame_array[0]):int(frame_array[-1])+1] = Y[start_frame:int(frame_array[-1])+1]
+		missing_all[count, int(frame_array[0]):int(frame_array[-1])+1] = missing[start_frame:int(frame_array[-1])+1]
 
 	if fill_gaps:
 		reject_frames = []
 	else:
-		reject_frames = np.zeros(max_frames, dtype=bool)
+		reject_frames = np.zeros(total_frames, dtype=bool)
 
-		for i in range(max_frames):
+		for i in range(total_frames):
 			if sum(missing_all[:,i]) > 3:
 				reject_frames[i] = True
 
