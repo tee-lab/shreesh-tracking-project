@@ -236,7 +236,7 @@ def perim_threshold(do_what, threshold):
 	Once thresholded, the "do_what" definition is called to analyze the outline
 	(with the appropriate parameters passed to it)"""
 
-	global Xall, outline_lengths, outlines, posture_frames, X, Y, current_fish_index
+	global Xall, outline_lengths, outlines, posture_frames
 
 	outline_iterator = 0
 	perims = np.zeros(outline_lengths.shape)
@@ -291,7 +291,6 @@ if __name__ == "__main__":
 
 		outlines, outline_lengths, offsets, posture_frames = utils.load_posture_file(cfg, count)
 
-		#X, Y, _ = utils.load_position_file(cfg, count)
 		X = Xall[count,:]
 		Y = Yall[count,:]
 

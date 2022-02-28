@@ -79,13 +79,12 @@ def get_switches():
 	max_fish_count = cfg.fish_count
 	jump_threshold = cfg.jump_thresh
 
-	Xall, _, reject_frames = utils.collate(cfg, fill_gaps=False)
+	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
 
 	switch_array = []
 
 	for count in range(0, max_fish_count):
 
-		#X, Y, frame_vec = utils.load_position_file(cfg, count)
 		X = Xall[count,:]
 		Y = Yall[count,:]
 
