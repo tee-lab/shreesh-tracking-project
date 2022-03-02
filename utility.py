@@ -251,14 +251,14 @@ def collate(config_file, fill_gaps=False):
 			if sum(missing_all[:,i]) > 3:
 				reject_frames[i] = True
 
-	return Xall, Yall, reject_frames
+	return Xall, Yall, reject_frames, start_frame
 
 if __name__=="__main__":
 	filename = sys.argv[1]
 
 	cfg = Config("config_files/"+filename+".csv")
 
-	Xall, Yall, _ = collate(cfg, fill_gaps=False)
+	Xall, Yall, _, _ = collate(cfg, fill_gaps=False)
 
 	# Xall_new = np.zeros((Xall.shape[0]-1, Xall.shape[1]))
 	# Yall_new = np.zeros((Xall.shape[0]-1, Xall.shape[1]))

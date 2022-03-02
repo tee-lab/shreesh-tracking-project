@@ -79,7 +79,7 @@ def get_switches():
 	max_fish_count = cfg.fish_count
 	jump_threshold = cfg.jump_thresh
 
-	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
+	Xall, Yall, reject_frames, first_frame = utils.collate(cfg, fill_gaps=False)
 
 	switch_array = []
 
@@ -124,6 +124,7 @@ def get_switches():
 	print("Skips happened at frames:")
 	switch_array.sort(key = lambda x: x.frame_num)
 	for switch in switch_array:
+		switch.frame_num += first_frame
 		switch.display()
 
 	utils.write_csv(switch_array, "csv_files/"+filename+"/posit_switches_"+filename+".csv")

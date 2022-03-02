@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
 	perims = np.array([])
 
-	Xall, Yall, reject_frames = utils.collate(cfg, fill_gaps=False)
+	Xall, Yall, reject_frames, first_frame = utils.collate(cfg, fill_gaps=False)
 
 	if False:
 
@@ -324,7 +324,9 @@ if __name__ == "__main__":
 	switch_array, removed = fix_id_switches(switch_array)
 
 	for switch in switch_array:
-			switch.display()
+		switch.frame_num += first_frame
+		switch.display()
+
 	print("Total: ", len(switch_array))
 	print("Removed: ", len(removed))
 
