@@ -7,7 +7,7 @@ def get_perims(config_file, count):
 
 	outlines, outline_lengths, _, posture_frames = utils.load_posture_file(config_file, count)
 
-	_, _, reject_frames = utils.collate(config_file)
+	_, _, reject_frames, _ = utils.collate(config_file)
 
 	outline_iterator = 0
 	perims = np.zeros(outline_lengths.shape)
