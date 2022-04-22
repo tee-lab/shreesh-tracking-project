@@ -8,11 +8,11 @@ def onclick(event):
 		('double' if event.dblclick else 'single', event.button,
 		event.x, event.y, event.xdata, event.ydata))
 
-def make_histogram(switch_array, filename):
-
+def get_switch_intervals(switch_array):
+	
 	del_t = []
 	
-	del_t_chained = []
+	del_t_chained = [0]
 
 	t_1 = []
 	del_t_1 = []
@@ -45,11 +45,40 @@ def make_histogram(switch_array, filename):
 				del_t_chained.append(diff)
 			else:
 				del_t_chained[-1] += diff
+	
+	type1_data = [t_1, del_t_1, del_t_1_indices]
+	type2_data = [t_2, del_t_2, del_t_2_indices]
+	
+	overall_data = [del_t, del_t_chained]
+	
+	return overall_data, type1_data, type2_data
 
+def make_histogram(switch_array, filename):
+
+	overall_data, type1_data, type2_data = get_switch_intervals(switch_array)
+	
+	del_t = overall_data[0]
+	del_t_chained = overall_data[1]
+	
+	t_1 = type1_data[0]
+	del_t_1 = type1_data[1]
+	del_t_1_indices = type1_data[2]
+	
+	t_2 = type2_data[0]
+	del_t_2 = type2_data[1]
+	del_t_2_indices = type2_data[2]
+	
+	framerate = 25
+	
 	del_t_1 = np.array(del_t_1)
 	del_t_2 = np.array(del_t_2)
-
-	framerate = 25
+	
+	plt.rc('font', size=10) #controls default text size
+	plt.rc('axes', titlesize=20) #fontsize of the title
+	plt.rc('axes', labelsize=20) #fontsize of the x and y labels
+	plt.rc('xtick', labelsize=13) #fontsize of the x tick labels
+	plt.rc('ytick', labelsize=13) #fontsize of the y tick labels
+	plt.rc('legend', fontsize=13) #fontsize of the legend
 
 	fig, axis = plt.subplots()
 	axis.bar(t_1, del_t_1/framerate, width=25, color="red", label="Type 0 and 1 errors")
@@ -85,12 +114,18 @@ def make_histogram(switch_array, filename):
 	plt.xlabel("Length of tracking interval in seconds")
 	plt.ylabel("Frequency")
 
-def analyze(filename):
-
-	switch_array = utils.read_csv("csv_files/"+filename+"/manual_switches_"+filename+".csv")
-
-	make_histogram(switch_array, filename)
-	plt.show()
+def analyze(filename, to_plot=True):
+	
+	try:
+		switch_array = utils.read_csv("csv_files/"+filename+"/manual_switches_"+filename+".csv")
+	except:
+		print("")
+	else:
+		if to_plot:
+			make_histogram(switch_array, filename, False)
+			plt.show()
+		else:
+			return get_switch_intervals(switch_array)
 
 if __name__ == "__main__":
 	filename = sys.argv[1]

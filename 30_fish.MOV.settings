@@ -1,15 +1,17 @@
 crop_offsets=[0.18,0.0,0.18,0.0]
 
 use_adaptive_threshold=false
-threshold=10
+threshold=8
 track_max_individuals=30
 
 blob_size_range=[0.01,1]
 
-use_closing=true
+dilation_size=-1
+
+use_closing=false
 closing_size=-3
 
-equalize_histogram=false
+equalize_histogram=true
 
 auto_minmax_size=true
 
@@ -20,5 +22,6 @@ track_speed_decay=0.5
 #image_invert=true
 
 match_mode=hungarian
+cam_circle_mark=true
 
 track_end_segment_for_speed=false

@@ -42,9 +42,10 @@ def plot_perims(cfg):
 	for count in range(cfg.fish_count):
 		all_perims = np.append(all_perims, get_perims(cfg, count))
 
+	all_perims = all_perims[all_perims>0]
 	plt.figure(1)
 	plt.hist(all_perims, bins=40)
-	plt.title("Perimeter frequencies")
+	plt.title("Posture Perimeter frequencies")
 	plt.xlabel("Perimeter (cm)")
 	plt.ylabel("Frequency")
 
@@ -57,8 +58,8 @@ def plot_skips(cfg):
 
 	plt.figure(2)
 	plt.hist(all_skips, bins=40)
-	plt.title("Skips")
-	plt.xlabel("Skips (cm)")
+	plt.title("Distance traveled per frame")
+	plt.xlabel("Per-frame distance (cm)")
 	plt.ylabel("Frequency")
 
 if __name__ == "__main__":
@@ -66,6 +67,13 @@ if __name__ == "__main__":
 	filename = sys.argv[1]
 
 	cfg = utils.Config("config_files/"+filename+".csv")
+	
+	plt.rc('font', size=20) #controls default text size
+	plt.rc('axes', titlesize=40) #fontsize of the title
+	plt.rc('axes', labelsize=40) #fontsize of the x and y labels
+	plt.rc('xtick', labelsize=26) #fontsize of the x tick labels
+	plt.rc('ytick', labelsize=26) #fontsize of the y tick labels
+	plt.rc('legend', fontsize=26) #fontsize of the legend
 
 	plot_perims(cfg)
 	plot_skips(cfg)

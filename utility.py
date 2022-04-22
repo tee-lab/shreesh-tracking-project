@@ -116,6 +116,19 @@ def read_csv(filename):
 
 	return switch_array
 
+def merge_switch_arrays(switch_array1, switch_array2):
+	
+	merged_array = []
+	for switch in switch_array1:
+		merged_array.append(switch)
+	
+	for switch in switch_array2:
+		merged_array.append(switch)
+	
+	merged_array.sort(key = lambda x: x.frame_num)
+	
+	return merged_array
+
 def load_posture_file(config_file, count):
 
 	cm_per_pixel = 0.02
